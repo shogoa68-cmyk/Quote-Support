@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>見積もり作成支援</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+    background: #f0f2f5;
+    padding: 24px;
+    color: #333;
+    font-size: 13px;
+  }
+
+  h1 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #2c3e50;
+    border-left: 4px solid #3498db;
+    padding-left: 12px;
+  }
+
+  .container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    overflow-x: auto;
+  }
+
+  /* ========== 見積もりヘッダー ========== */
+  .quote-header {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    background: #f8f9fb;
+    border: 1px solid #dde3ea;
+    border-radius: 6px;
+  }
+  .quote-field { display: flex; flex-direction: column; gap: 4px; }
+  .quote-field label {
+    font-size: 11px; font-weight: 600; color: #7f8c8d;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .quote-field input {
+    border: 1px solid #ccc; border-radius: 4px;
+    padding: 5px 9px; font-size: 13px; font-family: inherit;
+    outline: none; transition: border-color 0.15s; background: #fff;
+  }
+  .quote-field input:focus { border-color: #3498db; }
+  #qf-ref      { width: 130px; }
+  #qf-customer { width: 200px; }
+  #qf-person   { width: 110px; }
+
+  /* ========== テーブル ========== */
+  table { border-collapse: collapse; width: 100%; min-width: 1100px; }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 5px 7px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .hd-base   { background: #2c3e50; color: #fff; font-weight: 600; font-size: 12px; }
+  .hd-pay    { background: #2980b9; color: #fff; font-weight: 600; font-size: 12px; }
+  .hd-bill   { background: #27ae60; color: #fff; font-weight: 600; font-size: 12px; }
+  .hd-profit { background: #8e44ad; color: #fff; font-weight: 600; font-size: 12px; }
+
+  /* 課税 */
+  td.tax-cell { width: 44px; }
+  input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #e74c3c; }
+  tr.taxed td { background-color: rgba(231,76,60,0.04) !important; }
+  tr.taxed td.profit-pos { background-color: #fde8e8 !important; }
+
+  /* 入力共通 */
+  input[type="text"],
+  input[type="number"],
+  select {
+    border: 1px solid #ccc; border-radius: 3px; padding: 3px 5px;
+    font-size: 12px; font-family: inherit; background: #fff;
+    outline: none; transition: border-color 0.15s;
+  }
+  input[type="text"]:focus,
+  input[type="number"]:focus,
+  select:focus { border-color: #3498db; }
+  input[type="number"] { text-align: right; }
+
+  .w-name  { width: 130px; }
+  .w-qty   { width: 58px; }
+  .w-cur   { width: 62px; }
+  .w-price { width: 90px; }
+  .w-mkup  { width: 90px; }
+  .w-note  { width: 130px; }
+
+  /* 表示専用（選択・編集不可）*/
+  .display-field {
+    pointer-events: none !important;
+    cursor: default !important;
+    user-select: none !important;
+    background: #f4f4f4 !important;
+    border-color: #e0e0e0 !important;
+    color: #666 !important;
+  }
+  select.display-field { color: #666 !important; }
+
+  /* CD セル */
+  td.cd-cell { background: #f0f0f0; padding: 3px 5px; min-width: 100px; }
+
+  td.profit-cell { font-weight: bold; text-align: right; padding-right: 10px; min-width: 85px; }
+  td.profit-pos  { background: #eafaf1; color: #1e8449; }
+  td.profit-neg  { background: #fdf2f2; color: #c0392b; }
+  td.profit-zero { background: #f5f5f5; color: #888; }
+
+  tfoot td { background: #f5f6fa; font-weight: bold; font-size: 12px; }
+  tfoot .profit-pos { background: #d5f5e3; }
+  tfoot .profit-neg { background: #fadbd8; }
+  tfoot .profit-zero{ background: #ebebeb; }
+
+  .btn-del {
+    background: #e74c3c; color: white; border: none; border-radius: 3px;
+    cursor: pointer; padding: 3px 9px; font-size: 11px; transition: background 0.15s;
+  }
+  .btn-del:hover { background: #c0392b; }
+  .btn-ins {
+    background: #27ae60; color: white; border: none; border-radius: 3px;
+    cursor: pointer; padding: 3px 9px; font-size: 11px;
+    transition: background 0.15s; margin-left: 4px;
+  }
+  .btn-ins:hover { background: #1e8449; }
+  .btn-add {
+    display: inline-block; margin-top: 14px;
+    background: #3498db; color: white; border: none; border-radius: 5px;
+    cursor: pointer; padding: 9px 20px; font-size: 13px;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .btn-add:hover { background: #2980b9; }
+  .btn-reset {
+    display: inline-block; margin-top: 14px; margin-left: 10px;
+    background: #95a5a6; color: white; border: none; border-radius: 5px;
+    cursor: pointer; padding: 9px 16px; font-size: 13px;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .btn-reset:hover { background: #7f8c8d; }
+  .btn-preview {
+    display: inline-block; margin-top: 14px; margin-left: 10px;
+    background: #8e44ad; color: white; border: none; border-radius: 5px;
+    cursor: pointer; padding: 9px 20px; font-size: 13px;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .btn-preview:hover { background: #7d3c98; }
+
+  tbody tr:hover td { background-color: rgba(52,152,219,0.04); }
+  tbody tr:hover td.cd-cell { background-color: #e8e8e8; }
+  tbody tr:hover td.profit-pos { background-color: #c8f0d8; }
+  tbody tr:hover td.profit-neg { background-color: #f5cece; }
+
+  .tip { font-size: 11px; color: #888; margin-top: 10px; line-height: 1.8; }
+  .tip b { color: #27ae60; }
+  .tip b.red { color: #e74c3c; }
+  .tip b.gray { color: #7f8c8d; }
+
+  /* ========== プレビューモーダル ========== */
+  #previewOverlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); z-index: 1000;
+    justify-content: center; align-items: flex-start;
+    padding: 30px 20px; overflow-y: auto;
+  }
+  #previewOverlay.open { display: flex; }
+  #previewBox {
+    background: #fff; border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+    padding: 28px 30px 24px; width: 100%; max-width: 980px;
+  }
+  #previewBox h2 {
+    font-size: 16px; color: #2c3e50; margin-bottom: 16px;
+    border-left: 4px solid #8e44ad; padding-left: 10px;
+  }
+  .pv-meta {
+    display: flex; gap: 24px; flex-wrap: wrap; font-size: 12px;
+    margin-bottom: 14px; padding: 10px 14px;
+    background: #f8f9fb; border-radius: 5px; border: 1px solid #e0e5ec;
+  }
+  .pv-meta-item { display: flex; gap: 6px; align-items: center; }
+  .pv-meta-item .lbl { color: #888; font-weight: 600; }
+  .pv-meta-item .val { color: #2c3e50; font-weight: 500; }
+
+  #previewTableWrap { overflow-x: auto; }
+  #previewTable {
+    border-collapse: collapse; width: 100%; min-width: 800px;
+    font-size: 12px; user-select: text;
+  }
+  #previewTable th {
+    background: #2c3e50; color: #fff; border: 1px solid #aaa;
+    padding: 6px 10px; font-weight: 600;
+  }
+  #previewTable th.ph-pay    { background: #2980b9; }
+  #previewTable th.ph-bill   { background: #27ae60; }
+  #previewTable th.ph-profit { background: #8e44ad; }
+  #previewTable td { border: 1px solid #ccc; padding: 5px 10px; text-align: center; }
+  #previewTable td.pv-name { text-align: left; min-width: 120px; }
+  #previewTable td.pv-num  { text-align: right; }
+  #previewTable td.pv-cd   { text-align: right; background: #f0f0f0; color: #666; }
+  #previewTable td.pv-pr   { text-align: right; font-weight: bold; }
+  #previewTable td.pv-pos  { background: #eafaf1; color: #1e8449; }
+  #previewTable td.pv-neg  { background: #fdf2f2; color: #c0392b; }
+  #previewTable td.pv-zero { background: #f5f5f5; color: #888; }
+  #previewTable tr.pv-total td { background: #f5f6fa; font-weight: bold; }
+  #previewTable tr.pv-total td.pv-pos { background: #d5f5e3; }
+  #previewTable tr.pv-total td.pv-neg { background: #fadbd8; }
+  #previewTable td.pv-taxed { color: #e74c3c; }
+
+  .pv-btns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+  .pv-btn-copy {
+    background: #27ae60; color: white; border: none; border-radius: 5px;
+    cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .pv-btn-copy:hover { background: #1e8449; }
+  .pv-btn-csv {
+    background: #2980b9; color: white; border: none; border-radius: 5px;
+    cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .pv-btn-csv:hover { background: #1a6fa8; }
+  .pv-btn-close {
+    background: #95a5a6; color: white; border: none; border-radius: 5px;
+    cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .pv-btn-close:hover { background: #7f8c8d; }
+  .pv-copy-msg { font-size: 12px; color: #27ae60; opacity: 0; transition: opacity 0.4s; }
+  .pv-copy-msg.show { opacity: 1; }
+  .pv-hint { font-size: 11px; color: #999; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>見積もり作成支援ページ</h1>
+
+<div class="container">
+
+  <!-- 見積もりヘッダー -->
+  <div class="quote-header">
+    <div class="quote-field">
+      <label>仮 REF #</label>
+      <input type="text" id="qf-ref" placeholder="例）2024-001" />
+    </div>
+    <div class="quote-field">
+      <label>引き合い元名称</label>
+      <input type="text" id="qf-customer" placeholder="例）○○商事" />
+    </div>
+    <div class="quote-field">
+      <label>担当</label>
+      <input type="text" id="qf-person" placeholder="例）山田" />
+    </div>
+  </div>
+
+  <table id="quoteTable">
+    <thead>
+      <tr>
+        <th rowspan="2" class="hd-base" style="width:44px;">課税</th>
+        <th rowspan="2" class="hd-base">項目名</th>
+        <th colspan="4" class="hd-pay">支払い</th>
+        <th colspan="3" class="hd-bill">請求</th>
+        <th colspan="3" class="hd-profit">利益計算</th>
+        <th rowspan="2" class="hd-base"></th>
+      </tr>
+      <tr>
+        <th class="hd-pay">数量</th>
+        <th class="hd-pay">通貨</th>
+        <th class="hd-pay">単価</th>
+        <th class="hd-pay" style="color:#ccc;">① CD</th>
+        <th class="hd-bill" style="color:#bde8c8;">② 数量</th>
+        <th class="hd-bill" style="color:#bde8c8;">② 通貨</th>
+        <th class="hd-bill" style="color:#bde8c8;">② 単価</th>
+        <th class="hd-profit">③ 乗せ幅</th>
+        <th class="hd-profit">④ 利益</th>
+        <th class="hd-profit">備考</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" style="text-align:right; color:#555;">合　計</td>
+        <td>—</td>
+        <td style="background:#f0f0f0; color:#aaa; text-align:center;">—</td>
+        <td colspan="2">—</td>
+        <td id="tot-billing" style="text-align:right; padding-right:10px; min-width:85px;">—</td>
+        <td id="tot-markup"  style="text-align:right; padding-right:10px; min-width:85px;">—</td>
+        <td class="profit-cell profit-zero" id="tot-profit">—</td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <button class="btn-add"     onclick="addRow()">＋ 行を追加</button>
+  <button class="btn-preview" onclick="openPreview()">📋 プレビュー</button>
+  <button class="btn-reset"   onclick="resetAll()">リセット</button>
+
+  <p class="tip">
+    <b class="red">課税</b>：チェックで * を項目名先頭に追記　／
+    <b class="gray">CD・②列</b>：表示専用（編集・Tab 不可）<br>
+    ③ 乗せ幅 → ②単価へ加算　／　④ 利益 ＝ 請求合計（②数量 × ②単価）－ 支払い合計（数量 × 単価）
+  </p>
+</div>
+
+<!-- プレビューモーダル -->
+<div id="previewOverlay" onclick="overlayClick(event)">
+  <div id="previewBox">
+    <h2>📋 プレビュー（表計算形式）</h2>
+    <div id="pvMeta" class="pv-meta" style="display:none;"></div>
+    <div id="previewTableWrap"></div>
+    <div class="pv-btns">
+      <button class="pv-btn-copy" onclick="copyTSV()">📑 クリップボードにコピー（Excel 貼り付け用）</button>
+      <button class="pv-btn-csv"  onclick="downloadCSV()">⬇ CSV ダウンロード</button>
+      <button class="pv-btn-close" onclick="closePreview()">閉じる</button>
+      <span class="pv-copy-msg" id="copyMsg">✅ コピーしました！</span>
+    </div>
+    <p class="pv-hint">
+      ※ CSV はヘッダー行・合計行なし、データ行のみです。<br>
+      ※ 課税項目は項目名の先頭に * が付いています。
+    </p>
+  </div>
+</div>
+
+<script>
+  const CURRENCIES = ['JPY','USD','EUR','CNY','KRW','SGD','HKD','GBP','AUD','TWD','THB','VND','MYR','IDR'];
+  let rowCount = 0;
+
+  function curOpts(sel) {
+    return CURRENCIES.map(c =>
+      `<option value="${c}"${c === sel ? ' selected' : ''}>${c}</option>`
+    ).join('');
+  }
+
+  function fmt(n) {
+    if (isNaN(n) || n === null) return '—';
+    return n.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  // ========== 行操作 ==========
+  // 備考列で Tab → 自動行追加して新行の項目名へフォーカス
+  function noteKeydown(e, id) {
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      const newId = addRowAfter(id);
+      setTimeout(() => document.getElementById(`nm-${newId}`)?.focus(), 0);
+    }
+  }
+
+  function addRowAfter(afterId) {
+    rowCount++;
+    const id = rowCount;
+    const tr = document.createElement('tr');
+    tr.id = `row-${id}`;
+    tr.innerHTML = buildRowHTML(id);
+    const refRow = document.getElementById(`row-${afterId}`);
+    if (refRow?.nextSibling) refRow.parentNode.insertBefore(tr, refRow.nextSibling);
+    else if (refRow)         refRow.parentNode.appendChild(tr);
+    else                     document.getElementById('tableBody').appendChild(tr);
+    onPay(id);
+    return id;
+  }
+
+  function addRow() {
+    rowCount++;
+    const id = rowCount;
+    const tr = document.createElement('tr');
+    tr.id = `row-${id}`;
+    tr.innerHTML = buildRowHTML(id);
+    document.getElementById('tableBody').appendChild(tr);
+    onPay(id);
+  }
+
+  function buildRowHTML(id) {
+    return `
+      <!-- 課税 -->
+      <td class="tax-cell">
+        <input type="checkbox" id="tx-${id}" onchange="toggleTax(${id})" title="課税">
+      </td>
+      <!-- 項目名 -->
+      <td><input type="text" id="nm-${id}" class="w-name" placeholder="例）海上運賃" /></td>
+      <!-- 支払い -->
+      <td><input type="number" id="pq-${id}" class="w-qty"   min="0" value="1" oninput="onPay(${id})" /></td>
+      <td><select              id="pc-${id}" class="w-cur"                      onchange="onPay(${id})">${curOpts('JPY')}</select></td>
+      <td><input type="number" id="pp-${id}" class="w-price" min="0" value="0" oninput="onPay(${id})" /></td>
+      <!-- ①CD：表示専用・Tabスキップ・計算外 -->
+      <td class="cd-cell">
+        <input type="number" id="cd-${id}" class="w-price display-field" value="9999" tabindex="-1" readonly />
+      </td>
+      <!-- 請求②：表示専用・Tabスキップ（自動反映） -->
+      <td><input type="number" id="bq-${id}" class="w-qty display-field" value="1" tabindex="-1" readonly /></td>
+      <td><select              id="bc-${id}" class="w-cur display-field"            tabindex="-1">${curOpts('JPY')}</select></td>
+      <td><input type="number" id="bp-${id}" class="w-price display-field" value="0" tabindex="-1" readonly data-base="0" /></td>
+      <!-- 乗せ幅・利益・備考 -->
+      <td><input type="number" id="mk-${id}" class="w-mkup" value="0" oninput="calc(${id})" /></td>
+      <td class="profit-cell profit-zero" id="pr-${id}">0</td>
+      <td><input type="text" id="nt-${id}" class="w-note" placeholder="備考" onkeydown="noteKeydown(event,${id})" /></td>
+      <td>
+        <button class="btn-del" onclick="delRow(${id})" tabindex="-1">削除</button>
+        <button class="btn-ins" onclick="addRowAfter(${id})" tabindex="-1">＋</button>
+      </td>
+    `;
+  }
+
+  // 課税チェック → 項目名先頭に * 追記／削除
+  function toggleTax(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const nm = document.getElementById(`nm-${id}`);
+    if (!tr || !nm) return;
+    const checked = document.getElementById(`tx-${id}`)?.checked;
+    if (checked) {
+      tr.classList.add('taxed');
+      if (!nm.value.startsWith('*')) nm.value = '*' + nm.value;
+    } else {
+      tr.classList.remove('taxed');
+      if (nm.value.startsWith('*')) nm.value = nm.value.slice(1);
+    }
+  }
+
+  // ========== 計算（CD列は参照のみ・計算外） ==========
+  function onPay(id) {
+    const pq = val(`pq-${id}`);
+    const pc = document.getElementById(`pc-${id}`)?.value;
+    const pp = val(`pp-${id}`);
+    const mk = val(`mk-${id}`);
+
+    // ②を自動反映（readonly なので .value を JS で直接セット）
+    const bqEl = document.getElementById(`bq-${id}`);
+    const bcEl = document.getElementById(`bc-${id}`);
+    const bpEl = document.getElementById(`bp-${id}`);
+    if (bqEl) bqEl.value = pq;
+    if (bcEl) bcEl.value = pc;
+    if (bpEl) {
+      bpEl.dataset.base = pp;
+      bpEl.value = pp + mk;
+    }
+    calc(id);
+  }
+
+  function calc(id) {
+    const pq = val(`pq-${id}`);
+    const pp = val(`pp-${id}`);
+    const bq = val(`bq-${id}`);
+    const mk = val(`mk-${id}`);
+
+    // ②単価 = base（支払い単価）+ 乗せ幅
+    const bpEl = document.getElementById(`bp-${id}`);
+    if (bpEl) {
+      const base = parseFloat(bpEl.dataset.base) || 0;
+      bpEl.value = base + mk;
+    }
+    const bp = val(`bp-${id}`);
+
+    const cost    = pq * pp;        // 支払い合計（計算用）
+    const billing = bq * bp;        // 請求合計
+    const profit  = billing - cost; // ④利益（CD は使わない）
+
+    const pr = document.getElementById(`pr-${id}`);
+    pr.textContent = fmt(profit);
+    pr.className   = `profit-cell ${pClass(profit)}`;
+    updateTotals();
+  }
+
+  function pClass(p) {
+    return p > 0 ? 'profit-pos' : p < 0 ? 'profit-neg' : 'profit-zero';
+  }
+
+  function val(id) {
+    return parseFloat(document.getElementById(id)?.value) || 0;
+  }
+
+  function updateTotals() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    if (!rows.length) {
+      ['tot-billing','tot-markup','tot-profit'].forEach(id => {
+        document.getElementById(id).textContent = '—';
+      });
+      document.getElementById('tot-profit').className = 'profit-cell profit-zero';
+      return;
+    }
+    let totCost = 0, totBill = 0, totMk = 0;
+    rows.forEach(tr => {
+      const id = tr.id.replace('row-', '');
+      totCost += val(`pq-${id}`) * val(`pp-${id}`);
+      totBill += val(`bq-${id}`) * val(`bp-${id}`);
+      totMk   += val(`mk-${id}`);
+    });
+    const totPr = totBill - totCost;
+    document.getElementById('tot-billing').textContent = fmt(totBill);
+    document.getElementById('tot-markup').textContent  = fmt(totMk);
+    const pEl = document.getElementById('tot-profit');
+    pEl.textContent = fmt(totPr);
+    pEl.className   = `profit-cell ${pClass(totPr)}`;
+  }
+
+  function delRow(id) {
+    document.getElementById(`row-${id}`)?.remove();
+    updateTotals();
+  }
+
+  function resetAll() {
+    if (!confirm('すべての行を削除してリセットしますか？')) return;
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    updateTotals();
+  }
+
+  // ========== プレビュー＆エクスポート ==========
+  function getQuoteHeader() {
+    return {
+      ref:      document.getElementById('qf-ref')?.value || '',
+      customer: document.getElementById('qf-customer')?.value || '',
+      person:   document.getElementById('qf-person')?.value || '',
+    };
+  }
+
+  function collectData() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    const data = [];
+    rows.forEach(tr => {
+      const id    = tr.id.replace('row-', '');
+      const taxed = document.getElementById(`tx-${id}`)?.checked || false;
+      const name  = document.getElementById(`nm-${id}`)?.value || '';
+      const pq    = val(`pq-${id}`);
+      const pc    = document.getElementById(`pc-${id}`)?.value || '';
+      const pp    = val(`pp-${id}`);
+      const cd    = val(`cd-${id}`);         // 参照用のみ
+      const bq    = val(`bq-${id}`);
+      const bc    = document.getElementById(`bc-${id}`)?.value || '';
+      const bp    = val(`bp-${id}`);
+      const mk    = val(`mk-${id}`);
+      const cost  = pq * pp;
+      const bill  = bq * bp;
+      const profit = bill - cost;             // CD は使わない
+      const note  = document.getElementById(`nt-${id}`)?.value || '';
+      data.push({ taxed, name, pq, pc, pp, cd, bq, bc, bp, mk, cost, bill, profit, note });
+    });
+    return data;
+  }
+
+  function openPreview() {
+    const data = collectData();
+    if (!data.length) { alert('行がありません。'); return; }
+    const hdr = getQuoteHeader();
+
+    let totCost = 0, totBill = 0, totMk = 0;
+    data.forEach(d => { totCost += d.cost; totBill += d.bill; totMk += d.mk; });
+    const totPr = totBill - totCost;
+
+    // メタ情報
+    const metaEl = document.getElementById('pvMeta');
+    const metaHTML = [
+      hdr.ref      ? `<div class="pv-meta-item"><span class="lbl">仮 REF #</span><span class="val">${escHtml(hdr.ref)}</span></div>` : '',
+      hdr.customer ? `<div class="pv-meta-item"><span class="lbl">引き合い元</span><span class="val">${escHtml(hdr.customer)}</span></div>` : '',
+      hdr.person   ? `<div class="pv-meta-item"><span class="lbl">担当</span><span class="val">${escHtml(hdr.person)}</span></div>` : '',
+    ].join('');
+    metaEl.innerHTML = metaHTML;
+    metaEl.style.display = metaHTML ? 'flex' : 'none';
+
+    // テーブル（11列）
+    let html = `<table id="previewTable">
+      <thead><tr>
+        <th>項目名</th>
+        <th class="ph-pay">数量</th><th class="ph-pay">通貨</th>
+        <th class="ph-pay">単価</th><th class="ph-pay" style="color:#ccc;">CD</th>
+        <th class="ph-bill">数量</th><th class="ph-bill">通貨</th><th class="ph-bill">単価</th>
+        <th class="ph-profit">乗せ幅</th><th class="ph-profit">利益</th><th class="ph-profit">備考</th>
+      </tr></thead><tbody>`;
+
+    data.forEach(d => {
+      const pc      = d.profit > 0 ? 'pv-pos' : d.profit < 0 ? 'pv-neg' : 'pv-zero';
+      const nameCls = d.taxed ? 'pv-name pv-taxed' : 'pv-name';
+      html += `<tr>
+        <td class="${nameCls}">${escHtml(d.name)}</td>
+        <td class="pv-num">${fmtRaw(d.pq)}</td>
+        <td>${escHtml(d.pc)}</td>
+        <td class="pv-num">${fmtRaw(d.pp)}</td>
+        <td class="pv-cd pv-num">${fmtRaw(d.cd)}</td>
+        <td class="pv-num">${fmtRaw(d.bq)}</td>
+        <td>${escHtml(d.bc)}</td>
+        <td class="pv-num">${fmtRaw(d.bp)}</td>
+        <td class="pv-num">${fmtRaw(d.mk)}</td>
+        <td class="pv-pr ${pc} pv-num">${fmtRaw(d.profit)}</td>
+        <td class="pv-name">${escHtml(d.note)}</td>
+      </tr>`;
+    });
+
+    const totPc = totPr > 0 ? 'pv-pos' : totPr < 0 ? 'pv-neg' : 'pv-zero';
+    html += `</tbody><tfoot>
+      <tr class="pv-total">
+        <td style="text-align:right;">合　計</td>
+        <td colspan="3">—</td>
+        <td style="background:#e8e8e8;color:#aaa;">—</td>
+        <td colspan="2">—</td>
+        <td class="pv-num">—</td>
+        <td class="pv-num">${fmtRaw(totMk)}</td>
+        <td class="pv-pr ${totPc} pv-num">${fmtRaw(totPr)}</td>
+        <td></td>
+      </tr>
+    </tfoot></table>`;
+
+    document.getElementById('previewTableWrap').innerHTML = html;
+    document.getElementById('previewOverlay').classList.add('open');
+  }
+
+  function closePreview() {
+    document.getElementById('previewOverlay').classList.remove('open');
+  }
+  function overlayClick(e) {
+    if (e.target === document.getElementById('previewOverlay')) closePreview();
+  }
+
+  // クリップボードコピー（ヘッダー＋データ＋合計）
+  function copyTSV() {
+    const data = collectData();
+    if (!data.length) return;
+    const hdr = getQuoteHeader();
+    let totCost = 0, totBill = 0, totMk = 0;
+    data.forEach(d => { totCost += d.cost; totBill += d.bill; totMk += d.mk; });
+    const totPr = totBill - totCost;
+
+    const lines = [];
+    if (hdr.ref || hdr.customer || hdr.person) {
+      if (hdr.ref)      lines.push(`仮REF#\t${hdr.ref}`);
+      if (hdr.customer) lines.push(`引き合い元\t${hdr.customer}`);
+      if (hdr.person)   lines.push(`担当\t${hdr.person}`);
+      lines.push('');
+    }
+    lines.push(['項目名','数量','通貨','単価','CD','数量','通貨','単価','乗せ幅','利益','備考'].join('\t'));
+    data.forEach(d => {
+      lines.push([d.name, fmtRaw(d.pq), d.pc, fmtRaw(d.pp), fmtRaw(d.cd),
+        fmtRaw(d.bq), d.bc, fmtRaw(d.bp), fmtRaw(d.mk), fmtRaw(d.profit), d.note].join('\t'));
+    });
+    lines.push(['合計','','','','—','','','',fmtRaw(totMk),fmtRaw(totPr),''].join('\t'));
+
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      const msg = document.getElementById('copyMsg');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2500);
+    }).catch(() => alert('コピーに失敗しました。'));
+  }
+
+  // CSV ダウンロード（データ行のみ・ヘッダー行・合計行なし）
+  function downloadCSV() {
+    const data = collectData();
+    if (!data.length) { alert('行がありません。'); return; }
+
+    const lines = data.map(d =>
+      [d.name, fmtRaw(d.pq), d.pc, fmtRaw(d.pp), fmtRaw(d.cd),
+       fmtRaw(d.bq), d.bc, fmtRaw(d.bp), fmtRaw(d.mk), fmtRaw(d.profit), d.note]
+      .map(csvEsc).join(',')
+    );
+
+    // BOM付きUTF-8（Excelで文字化けしないように）
+    const BOM = '﻿';
+    const blob = new Blob([BOM + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const hdr  = getQuoteHeader();
+    a.href     = url;
+    a.download = (hdr.ref ? hdr.ref + '_' : '') + '見積もり.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // CSV エスケープ（カンマ・改行・ダブルクォートを含む場合は引用符で囲む）
+  function csvEsc(v) {
+    const s = String(v == null ? '' : v);
+    return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r'))
+      ? '"' + s.replace(/"/g, '""') + '"'
+      : s;
+  }
+
+  function fmtRaw(n) {
+    if (isNaN(n) || n === null) return '';
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  addRow();
+</script>
+</body>
+</html>
