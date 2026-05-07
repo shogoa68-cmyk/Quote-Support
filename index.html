@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -7,238 +8,513 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
-    background: #f0f2f5;
-    padding: 24px;
-    color: #333;
-    font-size: 13px;
-  }
+body {
+font-family: ‘Helvetica Neue’, Arial, ‘Hiragino Kaku Gothic ProN’, sans-serif;
+background: #f0f2f5;
+padding: 24px;
+color: #333;
+font-size: 13px;
+}
 
-  h1 {
-    font-size: 18px;
-    margin-bottom: 16px;
-    color: #2c3e50;
-    border-left: 4px solid #3498db;
-    padding-left: 12px;
-  }
+h1 {
+font-size: 18px;
+margin-bottom: 16px;
+color: #2c3e50;
+border-left: 4px solid #3498db;
+padding-left: 12px;
+}
 
-  .container {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    overflow-x: auto;
-  }
+.container {
+background: white;
+border-radius: 8px;
+padding: 20px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+overflow-x: auto;
+}
 
-  /* ========== 見積もりヘッダー ========== */
-  .quote-header {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    margin-bottom: 16px;
-    padding: 14px 16px;
-    background: #f8f9fb;
-    border: 1px solid #dde3ea;
-    border-radius: 6px;
-  }
-  .quote-field { display: flex; flex-direction: column; gap: 4px; }
-  .quote-field label {
-    font-size: 11px; font-weight: 600; color: #7f8c8d;
-    text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  .quote-field input {
-    border: 1px solid #ccc; border-radius: 4px;
-    padding: 5px 9px; font-size: 13px; font-family: inherit;
-    outline: none; transition: border-color 0.15s; background: #fff;
-  }
-  .quote-field input:focus { border-color: #3498db; }
-  #qf-ref      { width: 130px; }
-  #qf-customer { width: 200px; }
-  #qf-person   { width: 110px; }
+/* ========== 見積もりヘッダー ========== */
+.quote-header {
+display: flex;
+gap: 16px;
+flex-wrap: wrap;
+align-items: flex-end;
+margin-bottom: 16px;
+padding: 14px 16px;
+background: #f8f9fb;
+border: 1px solid #dde3ea;
+border-radius: 6px;
+}
+.quote-field { display: flex; flex-direction: column; gap: 4px; }
+.quote-field label {
+font-size: 11px; font-weight: 600; color: #7f8c8d;
+text-transform: uppercase; letter-spacing: 0.04em;
+}
+.quote-field input {
+border: 1px solid #ccc; border-radius: 4px;
+padding: 5px 9px; font-size: 13px; font-family: inherit;
+outline: none; transition: border-color 0.15s; background: #fff;
+}
+.quote-field input:focus { border-color: #3498db; }
+#qf-ref      { width: 130px; }
+#qf-customer { width: 200px; }
+#qf-person   { width: 110px; }
 
-  /* ========== テーブル ========== */
-  table { border-collapse: collapse; width: 100%; min-width: 1100px; }
-  th, td {
-    border: 1px solid #ccc;
-    padding: 5px 7px;
-    text-align: center;
-    white-space: nowrap;
-  }
+/* ========== テーブル ========== */
+table { border-collapse: collapse; width: 100%; min-width: 1150px; }
+th, td {
+border: 1px solid #ccc;
+padding: 5px 7px;
+text-align: center;
+white-space: nowrap;
+}
 
-  .hd-base   { background: #2c3e50; color: #fff; font-weight: 600; font-size: 12px; }
-  .hd-pay    { background: #2980b9; color: #fff; font-weight: 600; font-size: 12px; }
-  .hd-bill   { background: #27ae60; color: #fff; font-weight: 600; font-size: 12px; }
-  .hd-profit { background: #8e44ad; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-base   { background: #2c3e50; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-pay    { background: #2980b9; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-bill   { background: #27ae60; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-profit { background: #8e44ad; color: #fff; font-weight: 600; font-size: 12px; }
 
-  /* 課税 */
-  td.tax-cell { width: 44px; }
-  input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #e74c3c; }
-  tr.taxed td { background-color: rgba(231,76,60,0.04) !important; }
-  tr.taxed td.profit-pos { background-color: #fde8e8 !important; }
+/* ドラッグハンドル */
+.drag-handle {
+cursor: grab;
+color: #aaa;
+font-size: 16px;
+padding: 0 4px;
+user-select: none;
+line-height: 1;
+}
+.drag-handle:active { cursor: grabbing; }
+td.handle-cell {
+width: 28px;
+background: #f8f9fb;
+padding: 3px 2px;
+}
 
-  /* 入力共通 */
-  input[type="text"],
-  input[type="number"],
-  select {
-    border: 1px solid #ccc; border-radius: 3px; padding: 3px 5px;
-    font-size: 12px; font-family: inherit; background: #fff;
-    outline: none; transition: border-color 0.15s;
-  }
-  input[type="text"]:focus,
-  input[type="number"]:focus,
-  select:focus { border-color: #3498db; }
-  input[type="number"] { text-align: right; }
+/* ドラッグ中の行スタイル */
+tr.dragging {
+opacity: 0.4;
+background: #eaf4fb !important;
+}
+tr.drag-over-top td {
+border-top: 3px solid #3498db !important;
+}
+tr.drag-over-bottom td {
+border-bottom: 3px solid #3498db !important;
+}
 
-  .w-name  { width: 130px; }
-  .w-qty   { width: 58px; }
-  .w-cur   { width: 62px; }
-  .w-price { width: 90px; }
-  .w-mkup  { width: 90px; }
-  .w-note  { width: 130px; }
+/* 課税 */
+td.tax-cell { width: 44px; }
+input[type=“checkbox”] { width: 16px; height: 16px; cursor: pointer; accent-color: #e74c3c; }
+tr.taxed td { background-color: rgba(231,76,60,0.04) !important; }
+tr.taxed td.profit-pos { background-color: #fde8e8 !important; }
 
-  /* 表示専用（選択・編集不可）*/
-  .display-field {
-    pointer-events: none !important;
-    cursor: default !important;
-    user-select: none !important;
-    background: #f4f4f4 !important;
-    border-color: #e0e0e0 !important;
-    color: #666 !important;
-  }
-  select.display-field { color: #666 !important; }
+/* 入力共通 */
+input[type=“text”],
+input[type=“number”],
+select {
+border: 1px solid #ccc; border-radius: 3px; padding: 3px 5px;
+font-size: 12px; font-family: inherit; background: #fff;
+outline: none; transition: border-color 0.15s;
+}
+input[type=“text”]:focus,
+input[type=“number”]:focus,
+select:focus { border-color: #3498db; }
+input[type=“number”] { text-align: right; }
 
-  /* CD セル */
-  td.cd-cell { background: #f0f0f0; padding: 3px 5px; min-width: 100px; }
+.w-name  { width: 130px; }
+.w-qty   { width: 58px; }
+.w-cur   { width: 62px; }
+.w-price { width: 90px; }
+.w-mkup  { width: 90px; }
+.w-note  { width: 130px; }
 
-  td.profit-cell { font-weight: bold; text-align: right; padding-right: 10px; min-width: 85px; }
-  td.profit-pos  { background: #eafaf1; color: #1e8449; }
-  td.profit-neg  { background: #fdf2f2; color: #c0392b; }
-  td.profit-zero { background: #f5f5f5; color: #888; }
+/* 表示専用 */
+.display-field {
+pointer-events: none !important;
+cursor: default !important;
+user-select: none !important;
+background: #f4f4f4 !important;
+border-color: #e0e0e0 !important;
+color: #666 !important;
+}
+select.display-field { color: #666 !important; }
 
-  tfoot td { background: #f5f6fa; font-weight: bold; font-size: 12px; }
-  tfoot .profit-pos { background: #d5f5e3; }
-  tfoot .profit-neg { background: #fadbd8; }
-  tfoot .profit-zero{ background: #ebebeb; }
+/* CD セル */
+td.cd-cell { background: #f0f0f0; padding: 3px 5px; min-width: 100px; }
 
-  .btn-del {
-    background: #e74c3c; color: white; border: none; border-radius: 3px;
-    cursor: pointer; padding: 3px 9px; font-size: 11px; transition: background 0.15s;
-  }
-  .btn-del:hover { background: #c0392b; }
-  .btn-ins {
-    background: #27ae60; color: white; border: none; border-radius: 3px;
-    cursor: pointer; padding: 3px 9px; font-size: 11px;
-    transition: background 0.15s; margin-left: 4px;
-  }
-  .btn-ins:hover { background: #1e8449; }
-  .btn-add {
-    display: inline-block; margin-top: 14px;
-    background: #3498db; color: white; border: none; border-radius: 5px;
-    cursor: pointer; padding: 9px 20px; font-size: 13px;
-    font-family: inherit; transition: background 0.15s;
-  }
-  .btn-add:hover { background: #2980b9; }
-  .btn-reset {
-    display: inline-block; margin-top: 14px; margin-left: 10px;
-    background: #95a5a6; color: white; border: none; border-radius: 5px;
-    cursor: pointer; padding: 9px 16px; font-size: 13px;
-    font-family: inherit; transition: background 0.15s;
-  }
-  .btn-reset:hover { background: #7f8c8d; }
-  .btn-preview {
-    display: inline-block; margin-top: 14px; margin-left: 10px;
-    background: #8e44ad; color: white; border: none; border-radius: 5px;
-    cursor: pointer; padding: 9px 20px; font-size: 13px;
-    font-family: inherit; transition: background 0.15s;
-  }
-  .btn-preview:hover { background: #7d3c98; }
+td.profit-cell { font-weight: bold; text-align: right; padding-right: 10px; min-width: 85px; }
+td.profit-pos  { background: #eafaf1; color: #1e8449; }
+td.profit-neg  { background: #fdf2f2; color: #c0392b; }
+td.profit-zero { background: #f5f5f5; color: #888; }
 
-  tbody tr:hover td { background-color: rgba(52,152,219,0.04); }
-  tbody tr:hover td.cd-cell { background-color: #e8e8e8; }
-  tbody tr:hover td.profit-pos { background-color: #c8f0d8; }
-  tbody tr:hover td.profit-neg { background-color: #f5cece; }
+tfoot td { background: #f5f6fa; font-weight: bold; font-size: 12px; }
+tfoot .profit-pos { background: #d5f5e3; }
+tfoot .profit-neg { background: #fadbd8; }
+tfoot .profit-zero{ background: #ebebeb; }
 
-  .tip { font-size: 11px; color: #888; margin-top: 10px; line-height: 1.8; }
-  .tip b { color: #27ae60; }
-  .tip b.red { color: #e74c3c; }
-  .tip b.gray { color: #7f8c8d; }
+.btn-del {
+background: #e74c3c; color: white; border: none; border-radius: 3px;
+cursor: pointer; padding: 3px 9px; font-size: 11px; transition: background 0.15s;
+}
+.btn-del:hover { background: #c0392b; }
+.btn-ins {
+background: #27ae60; color: white; border: none; border-radius: 3px;
+cursor: pointer; padding: 3px 9px; font-size: 11px;
+transition: background 0.15s; margin-left: 4px;
+}
+.btn-ins:hover { background: #1e8449; }
+.btn-add {
+display: inline-block; margin-top: 14px;
+background: #3498db; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 9px 20px; font-size: 13px;
+font-family: inherit; transition: background 0.15s;
+}
+.btn-add:hover { background: #2980b9; }
+.btn-reset {
+display: inline-block; margin-top: 14px; margin-left: 10px;
+background: #95a5a6; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 9px 16px; font-size: 13px;
+font-family: inherit; transition: background 0.15s;
+}
+.btn-reset:hover { background: #7f8c8d; }
+.btn-preview {
+display: inline-block; margin-top: 14px; margin-left: 10px;
+background: #8e44ad; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 9px 20px; font-size: 13px;
+font-family: inherit; transition: background 0.15s;
+}
+.btn-preview:hover { background: #7d3c98; }
+.btn-csv-import {
+display: inline-block; margin-top: 14px; margin-left: 10px;
+background: #e67e22; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 9px 20px; font-size: 13px;
+font-family: inherit; transition: background 0.15s;
+}
+.btn-csv-import:hover { background: #d35400; }
 
-  /* ========== プレビューモーダル ========== */
-  #previewOverlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55); z-index: 1000;
-    justify-content: center; align-items: flex-start;
-    padding: 30px 20px; overflow-y: auto;
-  }
-  #previewOverlay.open { display: flex; }
-  #previewBox {
-    background: #fff; border-radius: 8px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.25);
-    padding: 28px 30px 24px; width: 100%; max-width: 980px;
-  }
-  #previewBox h2 {
-    font-size: 16px; color: #2c3e50; margin-bottom: 16px;
-    border-left: 4px solid #8e44ad; padding-left: 10px;
-  }
-  .pv-meta {
-    display: flex; gap: 24px; flex-wrap: wrap; font-size: 12px;
-    margin-bottom: 14px; padding: 10px 14px;
-    background: #f8f9fb; border-radius: 5px; border: 1px solid #e0e5ec;
-  }
-  .pv-meta-item { display: flex; gap: 6px; align-items: center; }
-  .pv-meta-item .lbl { color: #888; font-weight: 600; }
-  .pv-meta-item .val { color: #2c3e50; font-weight: 500; }
+/* CSV読み込みエリア */
+#csvDropZone {
+display: none;
+margin-top: 14px;
+border: 2px dashed #e67e22;
+border-radius: 6px;
+padding: 18px;
+text-align: center;
+color: #e67e22;
+font-size: 13px;
+background: #fff8f3;
+transition: background 0.2s;
+cursor: pointer;
+}
+#csvDropZone.active { background: #fde8d0; }
+#csvDropZone p { margin-top: 6px; font-size: 11px; color: #aaa; }
 
-  #previewTableWrap { overflow-x: auto; }
-  #previewTable {
-    border-collapse: collapse; width: 100%; min-width: 800px;
-    font-size: 12px; user-select: text;
-  }
-  #previewTable th {
-    background: #2c3e50; color: #fff; border: 1px solid #aaa;
-    padding: 6px 10px; font-weight: 600;
-  }
-  #previewTable th.ph-pay    { background: #2980b9; }
-  #previewTable th.ph-bill   { background: #27ae60; }
-  #previewTable th.ph-profit { background: #8e44ad; }
-  #previewTable td { border: 1px solid #ccc; padding: 5px 10px; text-align: center; }
-  #previewTable td.pv-name { text-align: left; min-width: 120px; }
-  #previewTable td.pv-num  { text-align: right; }
-  #previewTable td.pv-cd   { text-align: right; background: #f0f0f0; color: #666; }
-  #previewTable td.pv-pr   { text-align: right; font-weight: bold; }
-  #previewTable td.pv-pos  { background: #eafaf1; color: #1e8449; }
-  #previewTable td.pv-neg  { background: #fdf2f2; color: #c0392b; }
-  #previewTable td.pv-zero { background: #f5f5f5; color: #888; }
-  #previewTable tr.pv-total td { background: #f5f6fa; font-weight: bold; }
-  #previewTable tr.pv-total td.pv-pos { background: #d5f5e3; }
-  #previewTable tr.pv-total td.pv-neg { background: #fadbd8; }
-  #previewTable td.pv-taxed { color: #e74c3c; }
+/* 読み込み成功メッセージ */
+#csvMsg {
+display: none;
+margin-top: 10px;
+padding: 8px 14px;
+border-radius: 5px;
+font-size: 12px;
+font-weight: 600;
+}
+#csvMsg.success { background: #eafaf1; color: #1e8449; display: block; }
+#csvMsg.error   { background: #fdf2f2; color: #c0392b; display: block; }
 
-  .pv-btns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
-  .pv-btn-copy {
-    background: #27ae60; color: white; border: none; border-radius: 5px;
-    cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
-    transition: background 0.15s;
-  }
-  .pv-btn-copy:hover { background: #1e8449; }
-  .pv-btn-csv {
-    background: #2980b9; color: white; border: none; border-radius: 5px;
-    cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
-    transition: background 0.15s;
-  }
-  .pv-btn-csv:hover { background: #1a6fa8; }
-  .pv-btn-close {
-    background: #95a5a6; color: white; border: none; border-radius: 5px;
-    cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
-    transition: background 0.15s;
-  }
-  .pv-btn-close:hover { background: #7f8c8d; }
-  .pv-copy-msg { font-size: 12px; color: #27ae60; opacity: 0; transition: opacity 0.4s; }
-  .pv-copy-msg.show { opacity: 1; }
-  .pv-hint { font-size: 11px; color: #999; margin-top: 10px; }
+/* ========== 引き合い条件 ========== */
+.condition-section {
+margin-top: 24px;
+background: white;
+border-radius: 8px;
+padding: 20px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+.condition-section h2 {
+font-size: 15px;
+color: #2c3e50;
+border-left: 4px solid #16a085;
+padding-left: 10px;
+margin-bottom: 16px;
+cursor: pointer;
+user-select: none;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.condition-section h2 .toggle-icon { font-size: 12px; color: #aaa; }
+
+.condition-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+gap: 14px 20px;
+margin-bottom: 16px;
+}
+.cond-field { display: flex; flex-direction: column; gap: 5px; }
+.cond-field label {
+font-size: 11px; font-weight: 600; color: #7f8c8d;
+text-transform: uppercase; letter-spacing: 0.04em;
+display: flex; align-items: center; gap: 4px;
+}
+.cond-field label .cond-icon { font-size: 13px; }
+.cond-field input,
+.cond-field select,
+.cond-field textarea {
+border: 1px solid #ccc; border-radius: 4px;
+padding: 6px 9px; font-size: 13px; font-family: inherit;
+outline: none; transition: border-color 0.15s; background: #fff;
+color: #333;
+}
+.cond-field input:focus,
+.cond-field select:focus,
+.cond-field textarea:focus { border-color: #16a085; }
+
+.cond-divider {
+grid-column: 1 / -1;
+border: none;
+border-top: 1px dashed #e0e5ec;
+margin: 2px 0;
+}
+.cond-section-label {
+grid-column: 1 / -1;
+font-size: 11px;
+font-weight: 700;
+color: #16a085;
+text-transform: uppercase;
+letter-spacing: 0.06em;
+margin-bottom: -4px;
+}
+
+.cond-free {
+margin-top: 6px;
+}
+.cond-free label {
+font-size: 11px; font-weight: 600; color: #7f8c8d;
+text-transform: uppercase; letter-spacing: 0.04em;
+display: block; margin-bottom: 6px;
+}
+#condFreeText {
+width: 100%; min-height: 80px;
+border: 1px solid #ccc; border-radius: 4px;
+padding: 8px 10px; font-size: 12px; font-family: inherit;
+line-height: 1.8; resize: vertical; outline: none;
+transition: border-color 0.15s;
+}
+#condFreeText:focus { border-color: #16a085; }
+
+.cond-actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn-cond-clear {
+background: #ecf0f1; color: #7f8c8d; border: none; border-radius: 4px;
+padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: inherit;
+transition: background 0.15s;
+}
+.btn-cond-clear:hover { background: #bdc3c7; color: #2c3e50; }
+
+/* プレビュー内：引き合い条件 */
+#pvCondBox {
+margin-bottom: 14px;
+padding: 12px 16px;
+background: #f0faf8;
+border: 1px solid #a8d8ce;
+border-radius: 5px;
+font-size: 12px;
+}
+#pvCondBox strong {
+display: block;
+font-size: 12px;
+color: #0e6655;
+margin-bottom: 8px;
+padding-bottom: 4px;
+border-bottom: 1px solid #a8d8ce;
+}
+.pv-cond-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+gap: 6px 16px;
+}
+.pv-cond-item { display: flex; gap: 6px; font-size: 12px; }
+.pv-cond-lbl { color: #7f8c8d; font-weight: 600; white-space: nowrap; }
+.pv-cond-val { color: #2c3e50; }
+.pv-cond-free {
+margin-top: 8px; padding-top: 8px;
+border-top: 1px dashed #a8d8ce;
+font-size: 12px; color: #2c3e50;
+white-space: pre-wrap; line-height: 1.7;
+}
+
+/* ========== リマーク欄 ========== */
+.remark-section {
+margin-top: 24px;
+background: white;
+border-radius: 8px;
+padding: 20px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+.remark-section h2 {
+font-size: 15px;
+color: #2c3e50;
+border-left: 4px solid #e67e22;
+padding-left: 10px;
+margin-bottom: 14px;
+cursor: pointer;
+user-select: none;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.remark-section h2 .toggle-icon { font-size: 12px; color: #aaa; }
+
+.remark-presets {
+display: flex;
+flex-wrap: wrap;
+gap: 8px;
+margin-bottom: 14px;
+}
+.preset-btn {
+background: #f0f4f8;
+border: 1px solid #c8d6e5;
+border-radius: 20px;
+padding: 5px 14px;
+font-size: 12px;
+cursor: pointer;
+color: #34495e;
+transition: all 0.15s;
+font-family: inherit;
+}
+.preset-btn:hover  { background: #dce8f5; border-color: #3498db; color: #2980b9; }
+.preset-btn.active { background: #d6eaf8; border-color: #3498db; color: #1a5276; font-weight: 600; }
+
+.remark-body { display: flex; flex-direction: column; gap: 10px; }
+#remarkTextarea {
+width: 100%;
+min-height: 140px;
+border: 1px solid #ccc;
+border-radius: 5px;
+padding: 10px 12px;
+font-size: 12px;
+font-family: inherit;
+line-height: 1.8;
+resize: vertical;
+outline: none;
+transition: border-color 0.15s;
+color: #333;
+}
+#remarkTextarea:focus { border-color: #e67e22; }
+.remark-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn-remark-clear {
+background: #ecf0f1; color: #7f8c8d; border: none; border-radius: 4px;
+padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: inherit;
+transition: background 0.15s;
+}
+.btn-remark-clear:hover { background: #bdc3c7; color: #2c3e50; }
+.remark-char { font-size: 11px; color: #bbb; margin-left: auto; }
+
+/* プレビュー内リマーク */
+#pvRemarkBox {
+margin-top: 16px;
+padding: 12px 14px;
+background: #fffdf5;
+border: 1px solid #f0d9a0;
+border-radius: 5px;
+font-size: 12px;
+line-height: 1.9;
+color: #5d4e00;
+white-space: pre-wrap;
+}
+#pvRemarkBox strong {
+display: block;
+margin-bottom: 6px;
+font-size: 12px;
+color: #7d5a00;
+border-bottom: 1px solid #f0d9a0;
+padding-bottom: 4px;
+}
+
+tbody tr:hover td { background-color: rgba(52,152,219,0.04); }
+tbody tr:hover td.cd-cell { background-color: #e8e8e8; }
+tbody tr:hover td.handle-cell { background-color: #eef0f3; }
+tbody tr:hover td.profit-pos { background-color: #c8f0d8; }
+tbody tr:hover td.profit-neg { background-color: #f5cece; }
+
+.tip { font-size: 11px; color: #888; margin-top: 10px; line-height: 1.8; }
+.tip b { color: #27ae60; }
+.tip b.red { color: #e74c3c; }
+.tip b.gray { color: #7f8c8d; }
+.tip b.blue { color: #3498db; }
+
+/* ========== プレビューモーダル ========== */
+#previewOverlay {
+display: none; position: fixed; inset: 0;
+background: rgba(0,0,0,0.55); z-index: 1000;
+justify-content: center; align-items: flex-start;
+padding: 30px 20px; overflow-y: auto;
+}
+#previewOverlay.open { display: flex; }
+#previewBox {
+background: #fff; border-radius: 8px;
+box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+padding: 28px 30px 24px; width: 100%; max-width: 980px;
+}
+#previewBox h2 {
+font-size: 16px; color: #2c3e50; margin-bottom: 16px;
+border-left: 4px solid #8e44ad; padding-left: 10px;
+}
+.pv-meta {
+display: flex; gap: 24px; flex-wrap: wrap; font-size: 12px;
+margin-bottom: 14px; padding: 10px 14px;
+background: #f8f9fb; border-radius: 5px; border: 1px solid #e0e5ec;
+}
+.pv-meta-item { display: flex; gap: 6px; align-items: center; }
+.pv-meta-item .lbl { color: #888; font-weight: 600; }
+.pv-meta-item .val { color: #2c3e50; font-weight: 500; }
+
+#previewTableWrap { overflow-x: auto; }
+#previewTable {
+border-collapse: collapse; width: 100%; min-width: 800px;
+font-size: 12px; user-select: text;
+}
+#previewTable th {
+background: #2c3e50; color: #fff; border: 1px solid #aaa;
+padding: 6px 10px; font-weight: 600;
+}
+#previewTable th.ph-pay    { background: #2980b9; }
+#previewTable th.ph-bill   { background: #27ae60; }
+#previewTable th.ph-profit { background: #8e44ad; }
+#previewTable td { border: 1px solid #ccc; padding: 5px 10px; text-align: center; }
+#previewTable td.pv-name { text-align: left; min-width: 120px; }
+#previewTable td.pv-num  { text-align: right; }
+#previewTable td.pv-cd   { text-align: right; background: #f0f0f0; color: #666; }
+#previewTable td.pv-pr   { text-align: right; font-weight: bold; }
+#previewTable td.pv-pos  { background: #eafaf1; color: #1e8449; }
+#previewTable td.pv-neg  { background: #fdf2f2; color: #c0392b; }
+#previewTable td.pv-zero { background: #f5f5f5; color: #888; }
+#previewTable tr.pv-total td { background: #f5f6fa; font-weight: bold; }
+#previewTable tr.pv-total td.pv-pos { background: #d5f5e3; }
+#previewTable tr.pv-total td.pv-neg { background: #fadbd8; }
+#previewTable td.pv-taxed { color: #e74c3c; }
+
+.pv-btns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+.pv-btn-copy {
+background: #27ae60; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+transition: background 0.15s;
+}
+.pv-btn-copy:hover { background: #1e8449; }
+.pv-btn-csv {
+background: #2980b9; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+transition: background 0.15s;
+}
+.pv-btn-csv:hover { background: #1a6fa8; }
+.pv-btn-close {
+background: #95a5a6; color: white; border: none; border-radius: 5px;
+cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+transition: background 0.15s;
+}
+.pv-btn-close:hover { background: #7f8c8d; }
+.pv-copy-msg { font-size: 12px; color: #27ae60; opacity: 0; transition: opacity 0.4s; }
+.pv-copy-msg.show { opacity: 1; }
+.pv-hint { font-size: 11px; color: #999; margin-top: 10px; }
 </style>
+
 </head>
 <body>
 
@@ -247,6 +523,7 @@
 <div class="container">
 
   <!-- 見積もりヘッダー -->
+
   <div class="quote-header">
     <div class="quote-field">
       <label>仮 REF #</label>
@@ -265,6 +542,7 @@
   <table id="quoteTable">
     <thead>
       <tr>
+        <th rowspan="2" class="hd-base" style="width:28px;"></th><!-- ハンドル列 -->
         <th rowspan="2" class="hd-base" style="width:44px;">課税</th>
         <th rowspan="2" class="hd-base">項目名</th>
         <th colspan="4" class="hd-pay">支払い</th>
@@ -288,6 +566,7 @@
     <tbody id="tableBody"></tbody>
     <tfoot>
       <tr>
+        <td></td><!-- ハンドル列 -->
         <td colspan="4" style="text-align:right; color:#555;">合　計</td>
         <td>—</td>
         <td style="background:#f0f0f0; color:#aaa; text-align:center;">—</td>
@@ -300,23 +579,228 @@
     </tfoot>
   </table>
 
-  <button class="btn-add"     onclick="addRow()">＋ 行を追加</button>
-  <button class="btn-preview" onclick="openPreview()">📋 プレビュー</button>
-  <button class="btn-reset"   onclick="resetAll()">リセット</button>
+<button class="btn-add"        onclick="addRow()">＋ 行を追加</button>
+<button class="btn-preview"    onclick="openPreview()">📋 プレビュー</button>
+<button class="btn-csv-import" onclick="toggleCsvZone()">📂 CSV読み込み</button>
+<button class="btn-reset"      onclick="resetAll()">リセット</button>
+
+  <!-- CSV読み込みエリア -->
+
+  <div id="csvDropZone" onclick="document.getElementById('csvFileInput').click()"
+       ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+    📂 クリックしてCSVを選択、またはここにドラッグ＆ドロップ
+    <p>※ 1行目にヘッダー行（項目名,数量,通貨,単価,乗せ幅,備考）がある場合は自動で読み飛ばします</p>
+    <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="loadCSV(event)" />
+  </div>
+  <div id="csvMsg"></div>
 
   <p class="tip">
-    <b class="red">課税</b>：チェックで * を項目名先頭に追記　／
-    <b class="gray">CD・②列</b>：表示専用（編集・Tab 不可）<br>
-    ③ 乗せ幅 → ②単価へ加算　／　④ 利益 ＝ 請求合計（②数量 × ②単価）－ 支払い合計（数量 × 単価）
+    <b class="blue">⠿</b>：行をドラッグして並び替え　／
+    <b class="green">＋</b>：その行の直下に行を挿入　／
+    <b class="red">課税</b>：チェックで * を項目名先頭に追記<br>
+    <b class="gray">CD・②列</b>：表示専用（編集・Tab 不可）　／
+    ③ 乗せ幅 → ②単価へ加算　／　④ 利益 ＝ 請求合計 － 支払い合計<br>
+    <b style="color:#e67e22;">📂 CSV読み込み</b>：エクスポートしたCSVを再読み込み可。既存行に追記されます。
   </p>
 </div>
 
+<!-- 引き合い条件 -->
+
+<div class="condition-section">
+  <h2 onclick="toggleCondBody()">
+    🚢 引き合い条件
+    <span class="toggle-icon" id="condToggleIcon">▼</span>
+  </h2>
+  <div id="condBody">
+    <div class="condition-grid">
+
+```
+  <!-- 輸送基本情報 -->
+  <div class="cond-section-label">🗺️ 輸送ルート</div>
+
+  <div class="cond-field">
+    <label><span class="cond-icon">📦</span> 積み地（CY/CFS）</label>
+    <input type="text" id="cond-pol" placeholder="例）Yokohama CY" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">🏁</span> 揚げ地（CY/CFS）</label>
+    <input type="text" id="cond-pod" placeholder="例）Shanghai CY" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">🏭</span> 集荷地（貨物の起点）</label>
+    <input type="text" id="cond-origin" placeholder="例）東京都品川区" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">📬</span> 納入地（最終仕向地）</label>
+    <input type="text" id="cond-dest" placeholder="例）上海市浦東新区" />
+  </div>
+
+  <hr class="cond-divider" />
+  <!-- 輸送条件 -->
+  <div class="cond-section-label">⚙️ 輸送条件</div>
+
+  <div class="cond-field">
+    <label><span class="cond-icon">🔖</span> インコタームズ</label>
+    <select id="cond-incoterms">
+      <option value="">— 選択 —</option>
+      <optgroup label="任意の場所">
+        <option>EXW（工場渡し）</option>
+        <option>FCA（運送人渡し）</option>
+        <option>CPT（輸送費込み）</option>
+        <option>CIP（輸送費・保険料込み）</option>
+        <option>DAP（仕向地持込渡し）</option>
+        <option>DPU（荷卸込持込渡し）</option>
+        <option>DDP（関税込持込渡し）</option>
+      </optgroup>
+      <optgroup label="海上・内水路専用">
+        <option>FAS（船側渡し）</option>
+        <option>FOB（本船渡し）</option>
+        <option>CFR（運賃込み）</option>
+        <option>CIF（運賃・保険料込み）</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">🚢</span> 輸送モード</label>
+    <select id="cond-mode">
+      <option value="">— 選択 —</option>
+      <option>海上（FCL）</option>
+      <option>海上（LCL）</option>
+      <option>航空（AIR）</option>
+      <option>海上＋陸上</option>
+      <option>航空＋陸上</option>
+      <option>陸上のみ</option>
+    </select>
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">📐</span> コンテナ・スペース</label>
+    <select id="cond-container">
+      <option value="">— 選択 —</option>
+      <option>20'GP × 1</option>
+      <option>40'GP × 1</option>
+      <option>40'HQ × 1</option>
+      <option>20'GP × 2</option>
+      <option>40'GP × 2</option>
+      <option>40'HQ × 2</option>
+      <option>20'RF（冷凍）</option>
+      <option>40'RF（冷凍）</option>
+      <option>LCL（混載）</option>
+      <option>未定</option>
+    </select>
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">🛠️</span> 作業範囲</label>
+    <select id="cond-scope">
+      <option value="">— 選択 —</option>
+      <option>集荷〜本船積み</option>
+      <option>集荷〜揚げ港CY</option>
+      <option>集荷〜最終納入地</option>
+      <option>本船積み〜揚げ港CY</option>
+      <option>本船積み〜最終納入地</option>
+      <option>揚げ港CY〜最終納入地</option>
+      <option>Door to Door</option>
+      <option>Port to Port</option>
+    </select>
+  </div>
+
+  <hr class="cond-divider" />
+  <!-- 貨物情報 -->
+  <div class="cond-section-label">📦 貨物情報</div>
+
+  <div class="cond-field">
+    <label><span class="cond-icon">🏷️</span> 貨物名</label>
+    <input type="text" id="cond-cargo" placeholder="例）自動車部品" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">⚖️</span> 重量（概算）</label>
+    <input type="text" id="cond-weight" placeholder="例）5,000 kg" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">📏</span> 容積（概算）</label>
+    <input type="text" id="cond-volume" placeholder="例）20 CBM" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">📦</span> 荷姿</label>
+    <input type="text" id="cond-packing" placeholder="例）カートン / パレット" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">☣️</span> 危険品・特殊貨物</label>
+    <select id="cond-hazmat">
+      <option value="">— 選択 —</option>
+      <option>なし（一般貨物）</option>
+      <option>危険品あり（クラス要確認）</option>
+      <option>温度管理品（冷蔵）</option>
+      <option>温度管理品（冷凍）</option>
+      <option>重量物・大型貨物</option>
+      <option>その他（特記事項参照）</option>
+    </select>
+  </div>
+
+  <hr class="cond-divider" />
+  <!-- スケジュール -->
+  <div class="cond-section-label">📅 スケジュール</div>
+
+  <div class="cond-field">
+    <label><span class="cond-icon">📅</span> 船積み予定日（ETD）</label>
+    <input type="date" id="cond-etd" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">🗓️</span> 到着希望日（ETA）</label>
+    <input type="date" id="cond-eta" />
+  </div>
+  <div class="cond-field">
+    <label><span class="cond-icon">⚡</span> 緊急度</label>
+    <select id="cond-urgency">
+      <option value="">— 選択 —</option>
+      <option>通常（レギュラー）</option>
+      <option>やや急ぎ</option>
+      <option>急ぎ（優先手配）</option>
+      <option>至急（エクスプレス）</option>
+    </select>
+  </div>
+
+</div>
+
+<!-- 自由入力欄 -->
+<div class="cond-free">
+  <label>📝 特記事項・補足（自由入力）</label>
+  <textarea id="condFreeText" placeholder="例）&#10;・荷主の工場でのバン詰め（FC Stuff）希望&#10;・特定船会社指定あり（ONE / MSC）&#10;・B/L条件：Shipper's Order B/L希望&#10;・その他ご要望・注意事項をご記入ください"></textarea>
+</div>
+
+<div class="cond-actions">
+  <button class="btn-cond-clear" onclick="clearConditions()">クリア</button>
+</div>
+```
+
+  </div>
+</div>
+
+<!-- リマーク欄 -->
+
+<div class="remark-section">
+  <h2 onclick="toggleRemarkBody()">
+    📝 全体リマーク（条件・免責事項）
+    <span class="toggle-icon" id="remarkToggleIcon">▼</span>
+  </h2>
+  <div id="remarkBody" class="remark-body">
+    <div class="remark-presets" id="presetBtns"></div>
+    <textarea id="remarkTextarea" placeholder="見積もり全体に適用する条件・免責事項を入力してください。上のボタンでプリセットを追加できます。"></textarea>
+    <div class="remark-actions">
+      <button class="btn-remark-clear" onclick="clearRemark()">クリア</button>
+      <span class="remark-char" id="remarkChar">0文字</span>
+    </div>
+  </div>
+</div>
+
 <!-- プレビューモーダル -->
+
 <div id="previewOverlay" onclick="overlayClick(event)">
   <div id="previewBox">
     <h2>📋 プレビュー（表計算形式）</h2>
     <div id="pvMeta" class="pv-meta" style="display:none;"></div>
+    <div id="pvCondBox" style="display:none;"><strong>🚢 引き合い条件</strong></div>
     <div id="previewTableWrap"></div>
+    <div id="pvRemarkBox" style="display:none;"><strong>📝 条件・リマーク</strong></div>
     <div class="pv-btns">
       <button class="pv-btn-copy" onclick="copyTSV()">📑 クリップボードにコピー（Excel 貼り付け用）</button>
       <button class="pv-btn-csv"  onclick="downloadCSV()">⬇ CSV ダウンロード</button>
@@ -333,6 +817,7 @@
 <script>
   const CURRENCIES = ['JPY','USD','EUR','CNY','KRW','SGD','HKD','GBP','AUD','TWD','THB','VND','MYR','IDR'];
   let rowCount = 0;
+  let dragSrcRow = null;
 
   function curOpts(sel) {
     return CURRENCIES.map(c =>
@@ -345,8 +830,58 @@
     return n.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
 
+  // ========== ドラッグ＆ドロップ ==========
+  function initDrag(tr) {
+    tr.setAttribute('draggable', 'true');
+
+    tr.addEventListener('dragstart', e => {
+      dragSrcRow = tr;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tr.id);
+      setTimeout(() => tr.classList.add('dragging'), 0);
+    });
+
+    tr.addEventListener('dragend', () => {
+      tr.classList.remove('dragging');
+      document.querySelectorAll('#tableBody tr').forEach(r => {
+        r.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+      dragSrcRow = null;
+      updateTotals();
+    });
+
+    tr.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!dragSrcRow || dragSrcRow === tr) return;
+      const rect = tr.getBoundingClientRect();
+      const mid  = rect.top + rect.height / 2;
+      document.querySelectorAll('#tableBody tr').forEach(r =>
+        r.classList.remove('drag-over-top', 'drag-over-bottom')
+      );
+      tr.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+    });
+
+    tr.addEventListener('dragleave', () => {
+      tr.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+
+    tr.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrcRow || dragSrcRow === tr) return;
+      const rect = tr.getBoundingClientRect();
+      const mid  = rect.top + rect.height / 2;
+      const tbody = document.getElementById('tableBody');
+      if (e.clientY < mid) {
+        tbody.insertBefore(dragSrcRow, tr);
+      } else {
+        tbody.insertBefore(dragSrcRow, tr.nextSibling);
+      }
+      tr.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+  }
+
   // ========== 行操作 ==========
-  // 備考列で Tab → 自動行追加して新行の項目名へフォーカス
   function noteKeydown(e, id) {
     if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
@@ -365,6 +900,7 @@
     if (refRow?.nextSibling) refRow.parentNode.insertBefore(tr, refRow.nextSibling);
     else if (refRow)         refRow.parentNode.appendChild(tr);
     else                     document.getElementById('tableBody').appendChild(tr);
+    initDrag(tr);
     onPay(id);
     return id;
   }
@@ -376,11 +912,16 @@
     tr.id = `row-${id}`;
     tr.innerHTML = buildRowHTML(id);
     document.getElementById('tableBody').appendChild(tr);
+    initDrag(tr);
     onPay(id);
   }
 
   function buildRowHTML(id) {
     return `
+      <!-- ドラッグハンドル -->
+      <td class="handle-cell">
+        <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+      </td>
       <!-- 課税 -->
       <td class="tax-cell">
         <input type="checkbox" id="tx-${id}" onchange="toggleTax(${id})" title="課税">
@@ -391,11 +932,11 @@
       <td><input type="number" id="pq-${id}" class="w-qty"   min="0" value="1" oninput="onPay(${id})" /></td>
       <td><select              id="pc-${id}" class="w-cur"                      onchange="onPay(${id})">${curOpts('JPY')}</select></td>
       <td><input type="number" id="pp-${id}" class="w-price" min="0" value="0" oninput="onPay(${id})" /></td>
-      <!-- ①CD：表示専用・Tabスキップ・計算外 -->
+      <!-- ①CD -->
       <td class="cd-cell">
         <input type="number" id="cd-${id}" class="w-price display-field" value="9999" tabindex="-1" readonly />
       </td>
-      <!-- 請求②：表示専用・Tabスキップ（自動反映） -->
+      <!-- 請求②：表示専用 -->
       <td><input type="number" id="bq-${id}" class="w-qty display-field" value="1" tabindex="-1" readonly /></td>
       <td><select              id="bc-${id}" class="w-cur display-field"            tabindex="-1">${curOpts('JPY')}</select></td>
       <td><input type="number" id="bp-${id}" class="w-price display-field" value="0" tabindex="-1" readonly data-base="0" /></td>
@@ -410,7 +951,6 @@
     `;
   }
 
-  // 課税チェック → 項目名先頭に * 追記／削除
   function toggleTax(id) {
     const tr = document.getElementById(`row-${id}`);
     const nm = document.getElementById(`nm-${id}`);
@@ -425,14 +965,13 @@
     }
   }
 
-  // ========== 計算（CD列は参照のみ・計算外） ==========
+  // ========== 計算 ==========
   function onPay(id) {
     const pq = val(`pq-${id}`);
     const pc = document.getElementById(`pc-${id}`)?.value;
     const pp = val(`pp-${id}`);
     const mk = val(`mk-${id}`);
 
-    // ②を自動反映（readonly なので .value を JS で直接セット）
     const bqEl = document.getElementById(`bq-${id}`);
     const bcEl = document.getElementById(`bc-${id}`);
     const bpEl = document.getElementById(`bp-${id}`);
@@ -451,7 +990,6 @@
     const bq = val(`bq-${id}`);
     const mk = val(`mk-${id}`);
 
-    // ②単価 = base（支払い単価）+ 乗せ幅
     const bpEl = document.getElementById(`bp-${id}`);
     if (bpEl) {
       const base = parseFloat(bpEl.dataset.base) || 0;
@@ -459,9 +997,9 @@
     }
     const bp = val(`bp-${id}`);
 
-    const cost    = pq * pp;        // 支払い合計（計算用）
-    const billing = bq * bp;        // 請求合計
-    const profit  = billing - cost; // ④利益（CD は使わない）
+    const cost    = pq * pp;
+    const billing = bq * bp;
+    const profit  = billing - cost;
 
     const pr = document.getElementById(`pr-${id}`);
     pr.textContent = fmt(profit);
@@ -532,14 +1070,14 @@
       const pq    = val(`pq-${id}`);
       const pc    = document.getElementById(`pc-${id}`)?.value || '';
       const pp    = val(`pp-${id}`);
-      const cd    = val(`cd-${id}`);         // 参照用のみ
+      const cd    = val(`cd-${id}`);
       const bq    = val(`bq-${id}`);
       const bc    = document.getElementById(`bc-${id}`)?.value || '';
       const bp    = val(`bp-${id}`);
       const mk    = val(`mk-${id}`);
       const cost  = pq * pp;
       const bill  = bq * bp;
-      const profit = bill - cost;             // CD は使わない
+      const profit = bill - cost;
       const note  = document.getElementById(`nt-${id}`)?.value || '';
       data.push({ taxed, name, pq, pc, pp, cd, bq, bc, bp, mk, cost, bill, profit, note });
     });
@@ -555,7 +1093,6 @@
     data.forEach(d => { totCost += d.cost; totBill += d.bill; totMk += d.mk; });
     const totPr = totBill - totCost;
 
-    // メタ情報
     const metaEl = document.getElementById('pvMeta');
     const metaHTML = [
       hdr.ref      ? `<div class="pv-meta-item"><span class="lbl">仮 REF #</span><span class="val">${escHtml(hdr.ref)}</span></div>` : '',
@@ -565,7 +1102,6 @@
     metaEl.innerHTML = metaHTML;
     metaEl.style.display = metaHTML ? 'flex' : 'none';
 
-    // テーブル（11列）
     let html = `<table id="previewTable">
       <thead><tr>
         <th>項目名</th>
@@ -608,6 +1144,52 @@
     </tfoot></table>`;
 
     document.getElementById('previewTableWrap').innerHTML = html;
+
+    // 引き合い条件をプレビューに反映
+    const cond = getConditions();
+    const condFields = [
+      { lbl: '積み地',         val: cond.pol },
+      { lbl: '揚げ地',         val: cond.pod },
+      { lbl: '集荷地',         val: cond.origin },
+      { lbl: '納入地',         val: cond.dest },
+      { lbl: 'インコタームズ', val: cond.incoterms },
+      { lbl: '輸送モード',     val: cond.mode },
+      { lbl: 'コンテナ',       val: cond.container },
+      { lbl: '作業範囲',       val: cond.scope },
+      { lbl: '貨物名',         val: cond.cargo },
+      { lbl: '重量',           val: cond.weight },
+      { lbl: '容積',           val: cond.volume },
+      { lbl: '荷姿',           val: cond.packing },
+      { lbl: '危険品',         val: cond.hazmat },
+      { lbl: 'ETD',            val: cond.etd },
+      { lbl: 'ETA',            val: cond.eta },
+      { lbl: '緊急度',         val: cond.urgency },
+    ].filter(f => f.val);
+
+    const pvCond = document.getElementById('pvCondBox');
+    if (condFields.length || cond.free) {
+      let condHtml = condFields.map(f =>
+        `<div class="pv-cond-item"><span class="pv-cond-lbl">${escHtml(f.lbl)}：</span><span class="pv-cond-val">${escHtml(f.val)}</span></div>`
+      ).join('');
+      pvCond.innerHTML = `<strong>🚢 引き合い条件</strong><div class="pv-cond-grid">${condHtml}</div>`;
+      if (cond.free) {
+        pvCond.innerHTML += `<div class="pv-cond-free">${escHtml(cond.free)}</div>`;
+      }
+      pvCond.style.display = 'block';
+    } else {
+      pvCond.style.display = 'none';
+    }
+
+    // リマーク欄をプレビューに反映
+    const remarkText = getRemarkText();
+    const pvRemark = document.getElementById('pvRemarkBox');
+    if (remarkText) {
+      pvRemark.style.display = 'block';
+      pvRemark.innerHTML = `<strong>📝 条件・リマーク</strong>${escHtml(remarkText)}`;
+    } else {
+      pvRemark.style.display = 'none';
+    }
+
     document.getElementById('previewOverlay').classList.add('open');
   }
 
@@ -618,7 +1200,6 @@
     if (e.target === document.getElementById('previewOverlay')) closePreview();
   }
 
-  // クリップボードコピー（ヘッダー＋データ＋合計）
   function copyTSV() {
     const data = collectData();
     if (!data.length) return;
@@ -641,6 +1222,13 @@
     });
     lines.push(['合計','','','','—','','','',fmtRaw(totMk),fmtRaw(totPr),''].join('\t'));
 
+    const remarkText = getRemarkText();
+    if (remarkText) {
+      lines.push('');
+      lines.push('【条件・リマーク】');
+      remarkText.split('\n').forEach(l => { if (l.trim()) lines.push(l); });
+    }
+
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       const msg = document.getElementById('copyMsg');
       msg.classList.add('show');
@@ -648,23 +1236,26 @@
     }).catch(() => alert('コピーに失敗しました。'));
   }
 
-  // CSV ダウンロード（データ行のみ・ヘッダー行・合計行なし）
   function downloadCSV() {
     const data = collectData();
     if (!data.length) { alert('行がありません。'); return; }
+    const hdr = getQuoteHeader();
+    let totCost = 0, totBill = 0, totMk = 0;
+    data.forEach(d => { totCost += d.cost; totBill += d.bill; totMk += d.mk; });
+    const totPr = totBill - totCost;
 
-    const lines = data.map(d =>
+    const headerRow = ['項目名','数量','通貨','単価','CD','数量(請求)','通貨(請求)','単価(請求)','乗せ幅','利益','備考'].map(csvEsc).join(',');
+    const dataRows  = data.map(d =>
       [d.name, fmtRaw(d.pq), d.pc, fmtRaw(d.pp), fmtRaw(d.cd),
        fmtRaw(d.bq), d.bc, fmtRaw(d.bp), fmtRaw(d.mk), fmtRaw(d.profit), d.note]
       .map(csvEsc).join(',')
     );
+    const totalRow = ['合計','','','','','','','',fmtRaw(totMk),fmtRaw(totPr),''].map(csvEsc).join(',');
 
-    // BOM付きUTF-8（Excelで文字化けしないように）
-    const BOM = '﻿';
-    const blob = new Blob([BOM + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const BOM  = '\uFEFF';
+    const blob = new Blob([BOM + [headerRow, ...dataRows, totalRow].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    const hdr  = getQuoteHeader();
     a.href     = url;
     a.download = (hdr.ref ? hdr.ref + '_' : '') + '見積もり.csv';
     document.body.appendChild(a);
@@ -673,7 +1264,204 @@
     URL.revokeObjectURL(url);
   }
 
-  // CSV エスケープ（カンマ・改行・ダブルクォートを含む場合は引用符で囲む）
+  // ========== CSV読み込み ==========
+  function toggleCsvZone() {
+    const zone = document.getElementById('csvDropZone');
+    const msg  = document.getElementById('csvMsg');
+    zone.style.display = zone.style.display === 'block' ? 'none' : 'block';
+    msg.className = '';
+    msg.textContent = '';
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById('csvDropZone').classList.add('active');
+  }
+  function onDragLeave() {
+    document.getElementById('csvDropZone').classList.remove('active');
+  }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('csvDropZone').classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (file) parseCSVFile(file);
+  }
+  function loadCSV(e) {
+    const file = e.target.files[0];
+    if (file) parseCSVFile(file);
+    e.target.value = '';
+  }
+
+  function parseCSVFile(file) {
+    if (!file.name.endsWith('.csv')) {
+      showCsvMsg('error', '⚠️ CSVファイル（.csv）を選択してください');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        let text = ev.target.result.replace(/^\uFEFF/, ''); // BOM除去
+        const rows = parseCSVText(text);
+        if (!rows.length) { showCsvMsg('error', '⚠️ データが見つかりませんでした'); return; }
+
+        // 1行目がヘッダーかチェック（数字でなければヘッダー行とみなす）
+        let dataRows = rows;
+        if (rows[0][0] && isNaN(parseFloat(rows[0][0]))) {
+          dataRows = rows.slice(1);
+        }
+        // 合計行・空行を除外
+        dataRows = dataRows.filter(r => r[0] && r[0] !== '合計');
+
+        if (!dataRows.length) { showCsvMsg('error', '⚠️ 有効なデータ行がありませんでした'); return; }
+
+        let added = 0;
+        dataRows.forEach(cols => {
+          rowCount++;
+          const id = rowCount;
+          const tr = document.createElement('tr');
+          tr.id = `row-${id}`;
+          tr.innerHTML = buildRowHTML(id);
+          document.getElementById('tableBody').appendChild(tr);
+          initDrag(tr);
+
+          const rawName = cols[0] || '';
+          const taxed   = rawName.startsWith('*');
+          const name    = taxed ? rawName.slice(1) : rawName;
+          const pq = parseFloat(cols[1]) || 1;
+          const pc = cols[2] || 'JPY';
+          const pp = parseFloat(cols[3]) || 0;
+          const mk = parseFloat(cols[8]) || 0;
+          const nt = cols[10] || '';
+
+          document.getElementById(`nm-${id}`).value = name;
+          document.getElementById(`pq-${id}`).value = pq;
+          document.getElementById(`pp-${id}`).value = pp;
+          document.getElementById(`mk-${id}`).value = mk;
+          document.getElementById(`nt-${id}`).value = nt;
+
+          const pcEl = document.getElementById(`pc-${id}`);
+          if (pcEl && CURRENCIES.includes(pc)) pcEl.value = pc;
+
+          if (taxed) {
+            document.getElementById(`tx-${id}`).checked = true;
+            toggleTax(id);
+          }
+          onPay(id);
+          added++;
+        });
+
+        showCsvMsg('success', `✅ ${added}行を読み込みました！`);
+      } catch (err) {
+        showCsvMsg('error', `⚠️ 読み込みエラー：${err.message}`);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  // CSV文字列をパース（ダブルクォート・カンマ対応）
+  function parseCSVText(text) {
+    const rows = [];
+    const lines = text.split(/\r?\n/);
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const cols = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (inQ) {
+          if (c === '"' && line[i+1] === '"') { cur += '"'; i++; }
+          else if (c === '"') { inQ = false; }
+          else { cur += c; }
+        } else {
+          if (c === '"') { inQ = true; }
+          else if (c === ',') { cols.push(cur); cur = ''; }
+          else { cur += c; }
+        }
+      }
+      cols.push(cur);
+      rows.push(cols);
+    });
+    return rows;
+  }
+
+  function showCsvMsg(type, text) {
+    const el = document.getElementById('csvMsg');
+    el.className = type;
+    el.textContent = text;
+    setTimeout(() => { el.className = ''; el.textContent = ''; }, 4000);
+  }
+
+  // ========== リマーク欄 ==========
+  const PRESETS = [
+    { label: '📅 有効期限',      text: '本見積もりの有効期限は発行日より30日間とします。' },
+    { label: '💱 為替変動',      text: '外貨建て料金は見積もり時の為替レートを基準としており、船積み時のレートにより変動します。' },
+    { label: '⛽ 燃油サーチャージ', text: '燃油サーチャージ（BAF/FAF）は市況により変動します。適用時点のレートを別途申し受けます。' },
+    { label: '🚢 スペース確保',   text: '船腹・航空スペースの確保は保証できません。手配状況により変更となる場合があります。' },
+    { label: '📦 重量・容積',    text: '運賃はW/Mの高い方を適用します（海上：1CBM＝1,000kg、航空：1CBM＝167kg）。' },
+    { label: '🛃 通関費用',      text: '通関費用・関税・消費税等は本見積もりに含まれておりません。' },
+    { label: '🛡️ 貨物保険',     text: '貨物保険料は含まれておりません。付保をご希望の場合は別途ご相談ください。' },
+    { label: '⚓ 港湾混雑',      text: '港湾混雑・ストライキ・天災等による遅延・追加費用は含まれておりません。' },
+    { label: '☣️ 危険品',       text: '危険品・温度管理貨物・特殊貨物については別途ご相談ください。条件が異なります。' },
+    { label: '🔄 条件変更',      text: '貨物の内容・数量・仕向地等に変更が生じた場合は再見積となります。' },
+    { label: '📋 書類締切',      text: 'B/L・AWB等の書類提出締め切りは船会社・航空会社の指定期日に従います。遅延の場合は追加費用が発生します。' },
+    { label: '🏦 支払条件',      text: '支払いは請求書発行後30日以内とします。期日を超過した場合、年利○%の遅延損害金が発生します。' },
+  ];
+
+  let remarkOpen = true;
+
+  function initRemarks() {
+    const wrap = document.getElementById('presetBtns');
+    PRESETS.forEach((p, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.textContent = p.label;
+      btn.dataset.index = i;
+      btn.onclick = () => togglePreset(i, btn);
+      wrap.appendChild(btn);
+    });
+    document.getElementById('remarkTextarea').addEventListener('input', updateRemarkChar);
+    updateRemarkChar();
+  }
+
+  function togglePreset(i, btn) {
+    const ta = document.getElementById('remarkTextarea');
+    const text = PRESETS[i].text;
+    if (btn.classList.contains('active')) {
+      // 解除：テキストから該当行を削除
+      const lines = ta.value.split('\n').filter(l => l.trim() !== text.trim());
+      ta.value = lines.join('\n').replace(/^\n+|\n+$/g, '');
+      btn.classList.remove('active');
+    } else {
+      // 追加
+      const cur = ta.value.trim();
+      ta.value = cur ? cur + '\n' + text : text;
+      btn.classList.add('active');
+    }
+    updateRemarkChar();
+  }
+
+  function clearRemark() {
+    if (!confirm('リマーク欄をクリアしますか？')) return;
+    document.getElementById('remarkTextarea').value = '';
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    updateRemarkChar();
+  }
+
+  function updateRemarkChar() {
+    const len = document.getElementById('remarkTextarea').value.length;
+    document.getElementById('remarkChar').textContent = `${len}文字`;
+  }
+
+  function toggleRemarkBody() {
+    remarkOpen = !remarkOpen;
+    document.getElementById('remarkBody').style.display = remarkOpen ? '' : 'none';
+    document.getElementById('remarkToggleIcon').textContent = remarkOpen ? '▼' : '▶';
+  }
+
+  function getRemarkText() {
+    return document.getElementById('remarkTextarea')?.value.trim() || '';
+  }
+
   function csvEsc(v) {
     const s = String(v == null ? '' : v);
     return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r'))
@@ -692,7 +1480,55 @@
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  initRemarks();
+  initConditions();
   addRow();
+
+  // ========== 引き合い条件 ==========
+  let condOpen = true;
+
+  function toggleCondBody() {
+    condOpen = !condOpen;
+    document.getElementById('condBody').style.display = condOpen ? '' : 'none';
+    document.getElementById('condToggleIcon').textContent = condOpen ? '▼' : '▶';
+  }
+
+  function clearConditions() {
+    if (!confirm('引き合い条件をクリアしますか？')) return;
+    const ids = ['cond-pol','cond-pod','cond-origin','cond-dest','cond-cargo',
+                 'cond-weight','cond-volume','cond-packing','cond-etd','cond-eta','condFreeText'];
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['cond-incoterms','cond-mode','cond-container','cond-scope','cond-hazmat','cond-urgency']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  }
+
+  function getConditions() {
+    const g = id => document.getElementById(id)?.value.trim() || '';
+    return {
+      pol:       g('cond-pol'),
+      pod:       g('cond-pod'),
+      origin:    g('cond-origin'),
+      dest:      g('cond-dest'),
+      incoterms: g('cond-incoterms'),
+      mode:      g('cond-mode'),
+      container: g('cond-container'),
+      scope:     g('cond-scope'),
+      cargo:     g('cond-cargo'),
+      weight:    g('cond-weight'),
+      volume:    g('cond-volume'),
+      packing:   g('cond-packing'),
+      hazmat:    g('cond-hazmat'),
+      etd:       g('cond-etd'),
+      eta:       g('cond-eta'),
+      urgency:   g('cond-urgency'),
+      free:      g('condFreeText'),
+    };
+  }
+
+  function initConditions() {
+    // 初期化不要（HTMLで定義済み）
+  }
 </script>
+
 </body>
 </html>
