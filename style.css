@@ -1452,9 +1452,12 @@ tbody tr:not([class*="cat-"]):hover td.profit-neg { background-color: #f5cece; }
 .autosave-restore-close {
   color: #aaa;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
-  padding: 0 2px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  font-family: inherit;
 }
 .autosave-restore-close:hover { color: #fff; }
 
@@ -1797,6 +1800,13 @@ tbody tr:not([class*="cat-"]):hover td.profit-neg { background-color: #f5cece; }
 .csv-col-modal-btn.ok:hover { background: #219a52; }
 .csv-col-modal-btn.cancel { background: #ecf0f1; color: #555; }
 .csv-col-modal-btn.cancel:hover { background: #ddd; }
+.csv-col-presets { display: flex; gap: 8px; margin-bottom: 10px; }
+.csv-col-preset-btn {
+  padding: 5px 12px; border: 1px solid #bdc3c7; border-radius: 5px;
+  background: #f5f6f7; color: #555; font-size: 12px; cursor: pointer;
+  font-family: inherit; transition: background 0.15s, border-color 0.15s;
+}
+.csv-col-preset-btn:hover { background: #e8f5e9; border-color: #27ae60; color: #27ae60; }
 .csv-col-all-toggle { font-size: 11px; color: #3498db; cursor: pointer; margin-bottom: 8px; display: inline-block; }
 .csv-col-all-toggle:hover { text-decoration: underline; }
 

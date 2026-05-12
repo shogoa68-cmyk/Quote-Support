@@ -135,48 +135,59 @@
 
   function buildReflectSelects(rt, cw, cbm, kg, pcs) {
     const quoteRows = document.querySelectorAll('#tableBody tr');
-    const opts = quoteRows.length
-      ? Array.from(quoteRows).map(tr => {
-          const id = tr.id.replace('row-', '');
-          const nm = document.getElementById(`nm-${id}`)?.value || '（名前なし）';
-          return `<option value="${id}">${escHtml(nm)}</option>`;
-        }).join('')
-      : '';
-
-    if (!opts) {
+    if (!quoteRows.length) {
       document.getElementById('calcReflectRows').innerHTML =
         '<p style="font-size:11px;color:#aaa;margin:4px 0;">見積もり行がありません</p>';
       return;
     }
 
-    const mkRow = (label, value, unit, key) => `
-      <div class="calc-reflect-row">
-        <span class="calc-reflect-lbl">${label}：<strong>${value} ${unit}</strong></span>
-        <select class="calc-row-select" id="refl-sel-${key}">
-          <option value="">— 行を選択 —</option>${opts}
-        </select>
-        <button class="btn-do-reflect" onclick="doReflect('${key}', ${value})">反映</button>
-      </div>`;
+    // 単位マッチ一括反映UI（単位が一致する全行に反映）
+    const mkRow = (label, value, unit, key, targetUnit) => {
+      const matchCount = Array.from(quoteRows).filter(tr => {
+        const id = tr.id.replace('row-', '');
+        return document.getElementById(`un-${id}`)?.value === targetUnit;
+      }).length;
+      const badge = matchCount > 0
+        ? `<span style="font-size:10px;color:#27ae60;margin-left:4px;">（単位「${targetUnit}」の行 ${matchCount}件）</span>`
+        : `<span style="font-size:10px;color:#aaa;margin-left:4px;">（単位「${targetUnit}」の行なし）</span>`;
+      return `
+        <div class="calc-reflect-row">
+          <span class="calc-reflect-lbl">${label}：<strong>${value} ${unit}</strong>${badge}</span>
+          <button class="btn-do-reflect" onclick="doReflect('${key}', ${value})">反映</button>
+        </div>`;
+    };
 
     document.getElementById('calcReflectRows').innerHTML =
-      mkRow('RT（海上）',  rt.toFixed(4),          'R/T', 'rt')  +
-      mkRow('CW（航空）',  Math.ceil(cw),           'kg',  'cw')  +
-      mkRow('CBM',         cbm.toFixed(4),          'CBM', 'cbm') +
-      mkRow('総重量',       Math.round(kg),          'kg',  'kg')  +
-      mkRow('個数',         pcs,                    'pcs', 'pcs');
+      mkRow('RT（海上）', rt.toFixed(4),   'R/T', 'rt',  'R/T') +
+      mkRow('CW（航空）', Math.ceil(cw),   'kg',  'cw',  'CW')  +
+      mkRow('CBM',        cbm.toFixed(4),  'CBM', 'cbm', 'CBM') +
+      mkRow('総重量',      Math.round(kg),  'kg',  'kg',  'kg')  +
+      mkRow('個数',        pcs,            'pcs', 'pcs', 'pcs');
   }
 
+  // 各キーに対応する単位文字列
+  const REFLECT_UNIT_MAP = { rt: 'R/T', cw: 'CW', cbm: 'CBM', kg: 'kg', pcs: 'pcs' };
+
   function doReflect(key, value) {
-    const sel   = document.getElementById(`refl-sel-${key}`);
-    const rowId = sel?.value;
-    if (!rowId) { alert('反映先の行を選択してください'); return; }
-    const qtyEl = document.getElementById(`pq-${rowId}`);
-    if (qtyEl) {
-      qtyEl.value = value;
-      onPay(parseInt(rowId));
-      sel.value = '';
-      qtyEl.classList.add('flash-reflect');
-      setTimeout(() => qtyEl.classList.remove('flash-reflect'), 900);
+    const targetUnit = REFLECT_UNIT_MAP[key];
+    let applied = 0;
+    document.querySelectorAll('#tableBody tr').forEach(tr => {
+      const id   = tr.id.replace('row-', '');
+      const unEl = document.getElementById(`un-${id}`);
+      if (!unEl || unEl.value !== targetUnit) return;
+      const qtyEl = document.getElementById(`pq-${id}`);
+      if (qtyEl) {
+        qtyEl.value = value;
+        onPay(parseInt(id));
+        qtyEl.classList.add('flash-reflect');
+        setTimeout(() => qtyEl.classList.remove('flash-reflect'), 900);
+        applied++;
+      }
+    });
+    if (applied === 0) {
+      showToast(`⚠️ 単位「${targetUnit}」の行が見つかりませんでした`, 'warn', 3000);
+    } else {
+      showToast(`✅ ${applied}行に反映（単位：${targetUnit}）`, 'success');
     }
   }
 

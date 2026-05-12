@@ -24,15 +24,13 @@
 
   // ========== ドラッグ＆ドロップ ==========
   function initDrag(tr) {
-    // ハンドルを掴んだらdraggableをtrueにし、dragendでリセット（mouseupリセット廃止）
+    // tr は常に draggable="true"。ハンドル以外からのドラッグは dragstart で防ぐ
+    tr.setAttribute('draggable', 'true');
     const handle = tr.querySelector('.drag-handle');
-    if (handle) {
-      handle.addEventListener('mousedown',   () => tr.setAttribute('draggable', 'true'));
-      handle.addEventListener('pointerdown', () => tr.setAttribute('draggable', 'true'));
-    }
 
     tr.addEventListener('dragstart', e => {
-      if (tr.getAttribute('draggable') !== 'true') {
+      // ハンドル（またはその子要素）以外からのドラッグは無効
+      if (!handle || !handle.contains(e.target)) {
         e.preventDefault(); return;
       }
       dragSrcRow = tr;
@@ -41,7 +39,6 @@
       setTimeout(() => tr.classList.add('dragging'), 0);
     });
     tr.addEventListener('dragend', () => {
-      tr.setAttribute('draggable', 'false');
       tr.classList.remove('dragging');
       document.querySelectorAll('#tableBody tr').forEach(r =>
         r.classList.remove('drag-over-top', 'drag-over-bottom'));

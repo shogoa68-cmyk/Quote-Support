@@ -239,6 +239,22 @@
     document.getElementById('csvColModal').classList.remove('open');
   }
 
+  // CSV列プリセット
+  // client: 客先提示用（カテゴリ・項目名・単位・請求数量・請求通貨・請求単価・小計・備考）
+  // internal: 社内管理用（全列）
+  const CSV_PRESET_COLS = {
+    client:   ['cat', 'name', 'un', 'bq', 'bc', 'bp', 'sub', 'note'],
+    internal: ['cat', 'name', 'pq', 'un', 'pc', 'pp', 'cd', 'bq', 'bc', 'bp', 'mk', 'sub', 'profit', 'note', 'sv'],
+  };
+
+  function applyCsvPreset(presetKey) {
+    const cols = CSV_PRESET_COLS[presetKey];
+    if (!cols) return;
+    document.querySelectorAll('.csv-col-chk').forEach(chk => {
+      chk.checked = cols.includes(chk.dataset.col);
+    });
+  }
+
   function toggleAllCsvCols() {
     const chks = document.querySelectorAll('.csv-col-chk');
     const allChecked = [...chks].every(c => c.checked);

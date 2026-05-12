@@ -348,9 +348,9 @@
   function openPresetMgr() {
     renderPresetList();
     document.getElementById('presetMgrModal').classList.add('open');
-    // 名前欄を管理番号入力欄から自動生成（空のときだけ）
+    // 名前欄を管理番号入力欄から常に自動生成（管理番号の入力情報を優先反映）
     const input = document.getElementById('presetNameInput');
-    if (input && !input.value.trim()) {
+    if (input) {
       input.value = _buildDefaultPresetName();
     }
     setTimeout(() => { input?.focus(); input?.select(); }, 50);
@@ -417,11 +417,17 @@
     const trs = document.querySelectorAll('#tableBody tr');
     (preset.data.rows || []).forEach((cells, i) => {
       if (!trs[i]) return;
+      const rowId = trs[i].id.replace('row-', '');
       trs[i].querySelectorAll('input, select, textarea').forEach((el, j) => {
         if (cells[j] !== undefined) el.value = cells[j];
       });
+      // グレーアウト・カテゴリ色・計算を正しく反映
+      checkUnfilled(rowId);
+      onCatChange(rowId);
+      onPay(rowId);
     });
     updateTotals();
+    calcLiveUpdate();
     updateRouteModeIcon();
     closePresetMgr();
     showToast('📂 「' + preset.name + '」を読み込みました', 'success');

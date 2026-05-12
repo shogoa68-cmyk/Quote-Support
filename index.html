@@ -39,7 +39,7 @@
 <div id="autosave-restore-bar">
   <span>💾 前回の自動保存データがあります</span>
   <button class="autosave-restore-btn" onclick="restoreAutoSave()">↩ 復元する</button>
-  <span class="autosave-restore-close" onclick="dismissRestoreBar()" title="閉じる">✕</span>
+  <button type="button" class="autosave-restore-close" onclick="dismissRestoreBar()" title="閉じる">✕</button>
 </div>
 
 <!-- ========== フィードバックモーダル（独自フォーム → Google Form 送信） ========== -->
@@ -614,6 +614,10 @@
 <div id="csvColModal" onclick="if(event.target===this)closeCsvColModal()">
   <div id="csvColBox">
     <h3>⬇ CSV出力：列を選択してください</h3>
+    <div class="csv-col-presets">
+      <button type="button" class="csv-col-preset-btn" onclick="applyCsvPreset('client')" title="請求項目のみ表示（支払い・マークアップ・利益を非表示）">📄 客先提示用</button>
+      <button type="button" class="csv-col-preset-btn" onclick="applyCsvPreset('internal')" title="支払い・マークアップ・利益・サブコンを含む全列表示">🏢 社内管理用</button>
+    </div>
     <span class="csv-col-all-toggle" onclick="toggleAllCsvCols()">すべて選択 / 解除</span>
     <div class="csv-col-grid" id="csvColGrid">
       <label><input type="checkbox" class="csv-col-chk" data-col="cat"    checked> カテゴリ</label>
@@ -684,9 +688,9 @@
 
 <template id="row-tpl">
   <td class="handle-cell">
-    <button class="row-move-btn row-move-up"  data-field="move-up"   tabindex="-1" title="上に移動">▲</button>
+    <button type="button" class="row-move-btn row-move-up"  data-field="move-up"   tabindex="-1" title="上に移動">▲</button>
     <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
-    <button class="row-move-btn row-move-down" data-field="move-down" tabindex="-1" title="下に移動">▼</button>
+    <button type="button" class="row-move-btn row-move-down" data-field="move-down" tabindex="-1" title="下に移動">▼</button>
   </td>
   <td class="cat-cell"><select class="w-cat" data-field="cat" data-col="0"></select></td>
   <td class="tax-cell"><input type="checkbox" data-field="tx" title="課税"></td>

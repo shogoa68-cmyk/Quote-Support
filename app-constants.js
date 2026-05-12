@@ -3,7 +3,7 @@
 
   // ========== 定数 ==========
   const CURRENCIES = ['JPY','USD','EUR','CNY','KRW','SGD','HKD','GBP','AUD','TWD','THB','VND','MYR','IDR'];
-  const UNITS = ['', 'B/L', 'CNTR', 'CBM', 'R/T', 'kg', 'TON', 'pcs', '件', '式', 'set', 'shipment', 'CTN', 'PLT', '時間', '日', 'HOUR', 'DAY'];
+  const UNITS = ['', 'B/L', 'CNTR', 'CBM', 'R/T', 'CW', 'kg', 'TON', 'pcs', '件', '式', 'set', 'shipment', 'CTN', 'PLT', '時間', '日', 'HOUR', 'DAY'];
 
   const CATEGORIES = [
     { value: '',           label: '— カテゴリ —',         cls: '' },
