@@ -1,0 +1,333 @@
+// ========== 行管理 (app-row.js) ==========
+
+  // ========== カテゴリ変更 ==========
+  function onCatChange(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const cat = document.getElementById(`cat-${id}`)?.value;
+    // cat-* クラスを全削除
+    tr.className = tr.className.split(' ').filter(c => !c.startsWith('cat-')).join(' ').trim();
+    if (cat) {
+      const catObj = CATEGORIES.find(c => c.value === cat);
+      if (catObj?.cls) tr.classList.add(catObj.cls);
+    }
+  }
+
+  // ========== 未入力グレーアウト ==========
+  function checkUnfilled(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const nm = document.getElementById(`nm-${id}`);
+    if (!tr || !nm) return;
+    nm.value.trim() === ''
+      ? tr.classList.add('row-unfilled')
+      : tr.classList.remove('row-unfilled');
+  }
+
+  // ========== ドラッグ＆ドロップ ==========
+  function initDrag(tr) {
+    // ハンドルを掴んだらdraggableをtrueにし、dragendでリセット（mouseupリセット廃止）
+    const handle = tr.querySelector('.drag-handle');
+    if (handle) {
+      handle.addEventListener('mousedown',   () => tr.setAttribute('draggable', 'true'));
+      handle.addEventListener('pointerdown', () => tr.setAttribute('draggable', 'true'));
+    }
+
+    tr.addEventListener('dragstart', e => {
+      if (tr.getAttribute('draggable') !== 'true') {
+        e.preventDefault(); return;
+      }
+      dragSrcRow = tr;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tr.id);
+      setTimeout(() => tr.classList.add('dragging'), 0);
+    });
+    tr.addEventListener('dragend', () => {
+      tr.setAttribute('draggable', 'false');
+      tr.classList.remove('dragging');
+      document.querySelectorAll('#tableBody tr').forEach(r =>
+        r.classList.remove('drag-over-top', 'drag-over-bottom'));
+      dragSrcRow = null;
+      updateTotals();
+    });
+    tr.addEventListener('dragover', e => {
+      if (!dragSrcRow) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragSrcRow === tr) return;
+      const mid = tr.getBoundingClientRect().top + tr.getBoundingClientRect().height / 2;
+      document.querySelectorAll('#tableBody tr').forEach(r =>
+        r.classList.remove('drag-over-top', 'drag-over-bottom'));
+      tr.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+    });
+    tr.addEventListener('dragleave', () =>
+      tr.classList.remove('drag-over-top', 'drag-over-bottom'));
+    tr.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!dragSrcRow || dragSrcRow === tr) return;
+      const mid = tr.getBoundingClientRect().top + tr.getBoundingClientRect().height / 2;
+      const tbody = document.getElementById('tableBody');
+      tbody.insertBefore(dragSrcRow, e.clientY < mid ? tr : tr.nextSibling);
+      tr.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+
+    // ▲▼ ボタンによる行移動
+    const upBtn   = tr.querySelector('.row-move-up');
+    const downBtn = tr.querySelector('.row-move-down');
+    if (upBtn)   upBtn.addEventListener('click',  () => moveRow(tr, -1));
+    if (downBtn) downBtn.addEventListener('click', () => moveRow(tr, +1));
+  }
+
+  function moveRow(tr, dir) {
+    const tbody = document.getElementById('tableBody');
+    if (dir < 0) {
+      const prev = tr.previousElementSibling;
+      if (prev) tbody.insertBefore(tr, prev);
+    } else {
+      const next = tr.nextElementSibling;
+      if (next) tbody.insertBefore(next, tr);
+    }
+    updateTotals();
+  }
+
+  // ========== 十字キー（↑↓）移動 ==========
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tableBody').addEventListener('keydown', e => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      const el  = e.target;
+      const col = el.dataset.col;
+      if (col === undefined) return;
+      e.preventDefault();
+      const tr    = el.closest('tr');
+      const rows  = Array.from(document.querySelectorAll('#tableBody tr'));
+      const idx   = rows.indexOf(tr);
+      const next  = e.key === 'ArrowUp' ? idx - 1 : idx + 1;
+      if (next >= 0 && next < rows.length) {
+        const nextEl = rows[next].querySelector(`[data-col="${col}"]`);
+        if (nextEl) {
+          nextEl.focus();
+          if (nextEl.type === 'text' || nextEl.type === 'number') nextEl.select();
+        }
+      } else if (e.key === 'ArrowDown' && next === rows.length) {
+        const newId = addRowAfter(tr.id.replace('row-', ''));
+        setTimeout(() => {
+          document.querySelector(`#row-${newId} [data-col="${col}"]`)?.focus();
+        }, 0);
+      }
+    });
+  });
+
+  // ========== 行操作 ==========
+  // Tabで行追加するかどうか（tabAddEnabledはapp-constants.jsで宣言済み）
+  function toggleTabAdd(on) {
+    tabAddEnabled = !!on;
+    localStorage.setItem('tabAddEnabled', on ? '1' : '0');
+    showSaveStatus('Tabで行追加: ' + (on ? 'ON' : 'OFF'));
+  }
+  function noteKeydown(e, id) {
+    if (e.key === 'Tab' && !e.shiftKey && tabAddEnabled) {
+      e.preventDefault();
+      const newId = addRowAfter(id);
+      setTimeout(() => document.getElementById(`nm-${newId}`)?.focus(), 0);
+    }
+  }
+
+  function addRowAfter(afterId) {
+    rowCount++;
+    const id = rowCount;
+    const tr = document.createElement('tr');
+    tr.id = `row-${id}`;
+    // 継承元の行からカテゴリ・通貨を取得
+    const srcCat = document.getElementById(`cat-${afterId}`)?.value || '';
+    const srcCur = document.getElementById(`pc-${afterId}`)?.value || 'JPY';
+    tr.replaceChildren(buildRowHTML(id, srcCat, srcCur));
+    tr.classList.add('row-unfilled');
+    const refRow = document.getElementById(`row-${afterId}`);
+    if (refRow?.nextSibling) refRow.parentNode.insertBefore(tr, refRow.nextSibling);
+    else if (refRow)         refRow.parentNode.appendChild(tr);
+    else                     document.getElementById('tableBody').appendChild(tr);
+    initDrag(tr);
+    onCatChange(id);  // カテゴリ色を適用
+    onPay(id);
+    return id;
+  }
+
+  function addRow() {
+    rowCount++;
+    const id = rowCount;
+    // 末尾行からカテゴリ・通貨を継承
+    const rows = document.querySelectorAll('#tableBody tr');
+    const lastRow = rows.length ? rows[rows.length - 1] : null;
+    const lastId  = lastRow ? lastRow.id.replace('row-', '') : null;
+    const srcCat  = lastId ? (document.getElementById(`cat-${lastId}`)?.value || '') : '';
+    const srcCur  = lastId ? (document.getElementById(`pc-${lastId}`)?.value  || 'JPY') : 'JPY';
+    const tr = document.createElement('tr');
+    tr.id = `row-${id}`;
+    tr.replaceChildren(buildRowHTML(id, srcCat, srcCur));
+    tr.classList.add('row-unfilled');
+    document.getElementById('tableBody').appendChild(tr);
+    initDrag(tr);
+    onCatChange(id);  // カテゴリ色を適用
+    onPay(id);
+  }
+
+  // ========== カテゴリー順ソート ==========
+  function sortByCategory() {
+    const tbody = document.getElementById('tableBody');
+    const rows  = Array.from(tbody.querySelectorAll('tr'));
+    if (rows.length < 2) return;
+    const catOrder = cat => {
+      const idx = CAT_VALUES.indexOf(cat);
+      return idx === -1 ? 999 : idx;
+    };
+    rows.sort((a, b) => {
+      const idA = a.id.replace('row-', '');
+      const idB = b.id.replace('row-', '');
+      const cA  = document.getElementById(`cat-${idA}`)?.value || '';
+      const cB  = document.getElementById(`cat-${idB}`)?.value || '';
+      return catOrder(cA) - catOrder(cB);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+    updateTotals();
+  }
+
+  function buildRowHTML(id, initCat = '', initCur = 'JPY') {
+    const tpl  = document.getElementById('row-tpl');
+    const frag = tpl.content.cloneNode(true);
+    const q    = f => frag.querySelector(`[data-field="${f}"]`);
+
+    // IDs
+    ['cat','tx','nm','pq','un','pc','pp','cd','bq','bc','bp','mk','st','pr','nt','sv','done']
+      .forEach(f => { q(f).id = `${f}-${id}`; });
+
+    // Select options
+    q('cat').innerHTML = catOpts(initCat);
+    q('pc').innerHTML  = curOpts(initCur);
+    q('bc').innerHTML  = curOpts('JPY');
+
+    // Event handlers
+    q('cat').onchange = () => onCatChange(id);
+    q('tx').onchange  = () => toggleTax(id);
+    q('nm').oninput   = () => checkUnfilled(id);
+    q('pq').oninput   = () => onPay(id);
+    q('pc').onchange  = () => onPay(id);
+    q('pp').oninput   = () => onPay(id);
+    q('mk').oninput   = () => calc(id);
+    q('nt').onkeydown = e  => noteKeydown(e, id);
+    q('done').onclick = () => toggleDone(id);
+    q('del').onclick  = () => delRow(id);
+    q('ins').onclick  = () => addRowAfter(id);
+
+    return frag;
+  }
+
+  function toggleTax(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const nm = document.getElementById(`nm-${id}`);
+    if (!tr || !nm) return;
+    const checked = document.getElementById(`tx-${id}`)?.checked;
+    if (checked) {
+      tr.classList.add('taxed');
+      if (!nm.value.startsWith('*')) nm.value = '*' + nm.value;
+    } else {
+      tr.classList.remove('taxed');
+      if (nm.value.startsWith('*')) nm.value = nm.value.slice(1);
+    }
+  }
+
+  // ========== 計算 ==========
+  function onPay(id) {
+    const pq = val(`pq-${id}`);
+    const pc = document.getElementById(`pc-${id}`)?.value;
+    const pp = val(`pp-${id}`);
+    const mk = val(`mk-${id}`);
+    const bqEl = document.getElementById(`bq-${id}`);
+    const bcEl = document.getElementById(`bc-${id}`);
+    const bpEl = document.getElementById(`bp-${id}`);
+    if (bqEl) bqEl.value = pq;
+    if (bcEl) bcEl.value = pc;
+    if (bpEl) { bpEl.dataset.base = pp; bpEl.value = pp + mk; }
+    calc(id);
+  }
+
+  function calc(id) {
+    const pq = val(`pq-${id}`);
+    const pp = val(`pp-${id}`);
+    const bq = val(`bq-${id}`);
+    const mk = val(`mk-${id}`);
+    const bpEl = document.getElementById(`bp-${id}`);
+    if (bpEl) bpEl.value = (parseFloat(bpEl.dataset.base) || 0) + mk;
+    const bp = val(`bp-${id}`);
+    const subtotal = bq * bp;             // 行の請求小計（数量 × 単価）
+    const profit   = subtotal - pq * pp;  // 行の利益（小計 - 支払い合計）
+    // 小計セル
+    const st = document.getElementById(`st-${id}`);
+    if (st) {
+      st.textContent = subtotal ? fmt(subtotal) : '—';
+      st.className   = 'subtotal-cell' + (subtotal ? ' subtotal-has-value' : '');
+    }
+    // 利益セル
+    const pr = document.getElementById(`pr-${id}`);
+    pr.textContent = fmt(profit);
+    pr.className   = `profit-cell ${pClass(profit)}`;
+    updateTotals();
+  }
+
+  function pClass(p) {
+    return p > 0 ? 'profit-pos' : p < 0 ? 'profit-neg' : 'profit-zero';
+  }
+
+  function val(id) {
+    return parseFloat(document.getElementById(id)?.value) || 0;
+  }
+
+  function updateTotals() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    if (!rows.length) {
+      ['tot-billing','tot-markup','tot-subtotal','tot-profit'].forEach(id =>
+        document.getElementById(id).textContent = '—');
+      document.getElementById('tot-profit').className = 'profit-cell profit-zero';
+      return;
+    }
+    let totCost = 0, totBill = 0, totMk = 0, totSub = 0;
+    rows.forEach(tr => {
+      const id = tr.id.replace('row-', '');
+      totCost += val(`pq-${id}`) * val(`pp-${id}`);
+      const sub = val(`bq-${id}`) * val(`bp-${id}`);
+      totBill += sub;
+      totSub  += sub;
+      totMk   += val(`mk-${id}`);
+    });
+    const totPr = totBill - totCost;
+    document.getElementById('tot-billing').textContent  = fmt(totBill);
+    document.getElementById('tot-markup').textContent   = fmt(totMk);
+    document.getElementById('tot-subtotal').textContent = fmt(totSub);
+    const pEl = document.getElementById('tot-profit');
+    pEl.textContent = fmt(totPr);
+    pEl.className   = `profit-cell ${pClass(totPr)}`;
+  }
+
+  function delRow(id) {
+    document.getElementById(`row-${id}`)?.remove();
+    updateTotals();
+  }
+
+  // 未入力行（row-unfilled）を一括削除
+  function deleteEmptyRows() {
+    const empties = document.querySelectorAll('#tableBody tr.row-unfilled');
+    if (!empties.length) {
+      showToast('🧹 未入力行はありません', 'success', 2500);
+      return;
+    }
+    if (!confirm(`未入力（グレーアウト）の行を ${empties.length} 件削除しますか？`)) return;
+    empties.forEach(tr => tr.remove());
+    updateTotals();
+    showToast(`🧹 未入力行を ${empties.length} 件削除しました`, 'success');
+  }
+
+  function resetAll() {
+    if (!confirm('すべての行を削除してリセットしますか？')) return;
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    updateTotals();
+  }

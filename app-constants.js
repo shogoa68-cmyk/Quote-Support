@@ -1,0 +1,114 @@
+// ========== 定数・グローバル変数 ==========
+// ※ このファイルを最初に読み込むこと
+
+  // ========== 定数 ==========
+  const CURRENCIES = ['JPY','USD','EUR','CNY','KRW','SGD','HKD','GBP','AUD','TWD','THB','VND','MYR','IDR'];
+  const UNITS = ['', 'B/L', 'CNTR', 'CBM', 'R/T', 'kg', 'TON', 'pcs', '件', '式', 'set', 'shipment', 'CTN', 'PLT', '時間', '日', 'HOUR', 'DAY'];
+
+  const CATEGORIES = [
+    { value: '',           label: '— カテゴリ —',         cls: '' },
+    { value: 'domestic',   label: '🏠 国内作業',           cls: 'cat-domestic'   },
+    { value: 'export-local', label: '📤 輸出ローカルチャージ', cls: 'cat-export-local' },
+    { value: 'ocean',      label: '🚢 海上運賃',           cls: 'cat-ocean'      },
+    { value: 'air',        label: '✈️ 航空運賃',          cls: 'cat-air'        },
+    { value: 'surcharge',  label: '⚡ サーチャージ',        cls: 'cat-surcharge'  },
+    { value: 'import-local', label: '📥 輸入ローカルチャージ', cls: 'cat-import-local' },
+    { value: 'overseas',   label: '🌏 海外作業',           cls: 'cat-overseas'   },
+    { value: 'customs',    label: '🛃 通関費',             cls: 'cat-customs'    },
+    { value: 'insurance',  label: '🛡️ 保険料',            cls: 'cat-insurance'  },
+    { value: 'other',      label: '📋 その他',             cls: 'cat-other'      },
+  ];
+  const CAT_VALUES = CATEGORIES.map(c => c.value);
+
+  // ---- 各スコープに対応する見積プリセット行 ----
+  // cat: CATEGORIES の value と一致させること
+  const SCOPE_PRESETS = {
+    domestic: [
+      { cat: 'domestic',  name: '国内集荷・陸送費',  note: '集荷先〜倉庫/港' },
+      { cat: 'domestic',  name: '荷役・仕分け費',    note: '積み下ろし・仕分け作業' },
+      { cat: 'domestic',  name: '国内配送費',        note: '倉庫/港〜納入地' },
+      { cat: 'other',     name: 'その他国内費用',    note: '' },
+    ],
+    export: [
+      { cat: 'domestic',  name: '国内集荷・陸送費',  note: '集荷先〜輸出港' },
+      { cat: 'customs',   name: '輸出通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '港湾諸費用（輸出）', note: 'THC・ドキュメント費等' },
+      { cat: 'ocean',     name: '海上運賃',          note: 'ポート〜ポート' },
+      { cat: 'surcharge', name: 'サーチャージ類',    note: 'BAF/CAF/PSS 等' },
+      { cat: 'overseas',  name: '仕向地費用',        note: 'D/O・目的港荷役等' },
+    ],
+    import: [
+      { cat: 'ocean',     name: '海上運賃',          note: '積み地港〜仕向港' },
+      { cat: 'surcharge', name: 'サーチャージ類',    note: 'BAF/CAF/PSS 等' },
+      { cat: 'overseas',  name: '仕向港費用',        note: 'THC・D/O 等' },
+      { cat: 'customs',   name: '輸入通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '国内配送費',        note: '港〜納入地' },
+      { cat: 'insurance', name: '海上保険料',        note: '保険条件に応じて' },
+    ],
+    dtd: [
+      { cat: 'domestic',  name: '国内集荷・陸送費',  note: '集荷先〜輸出港' },
+      { cat: 'customs',   name: '輸出通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '港湾諸費用（輸出）', note: 'THC・ドキュメント費等' },
+      { cat: 'ocean',     name: '海上運賃',          note: 'ポート〜ポート' },
+      { cat: 'surcharge', name: 'サーチャージ類',    note: 'BAF/CAF/PSS 等' },
+      { cat: 'overseas',  name: '仕向地費用',        note: 'D/O・目的港荷役等' },
+      { cat: 'customs',   name: '輸入通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '国内配送費（着地）', note: '港〜最終納入地' },
+    ],
+  };
+
+  // ===== 倉庫オプショントグル =====
+  // ===== コンテナ表示更新（輸送モードに応じて） =====
+  function updateRouteModeIcon() {
+    const mode = document.getElementById('cond-mode')?.value || '';
+    const needsContainer = !mode || mode.includes('FCL') || mode.includes('海上＋陸上');
+    const noContainer = !!mode && !needsContainer;
+    document.querySelectorAll('[data-scope-key="container"]').forEach(el => {
+      el.classList.toggle('mode-hidden', noContainer);
+      if (noContainer) el.setAttribute('data-mode-hidden','1');
+      else              el.removeAttribute('data-mode-hidden');
+    });
+    const modeHint = document.getElementById('mode-container-hint');
+    if (modeHint) modeHint.style.display = noContainer ? '' : 'none';
+  }
+
+  let insuranceOn = false;
+  function toggleInsurance() {
+    insuranceOn = !insuranceOn;
+    const btn = document.getElementById('insToggleBtn');
+    if (btn) btn.classList.toggle('ins-on', insuranceOn);
+  }
+
+
+  function curOpts(sel) {
+    return CURRENCIES.map(c =>
+      `<option value="${c}"${c === sel ? ' selected' : ''}>${c}</option>`
+    ).join('');
+  }
+
+  function catOpts(sel) {
+    return CATEGORIES.map(c =>
+      `<option value="${c.value}"${c.value === sel ? ' selected' : ''}>${c.label}</option>`
+    ).join('');
+  }
+
+  function unitOpts(sel) {
+    return UNITS.map(u =>
+      `<option value="${u}"${u === sel ? ' selected' : ''}>${u || '— 単位 —'}</option>`
+    ).join('');
+  }
+
+  function fmt(n) {
+    if (isNaN(n) || n === null) return '—';
+    return n.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+// ========== グローバル変数 ==========
+let rowCount      = 0;
+let dragSrcRow    = null;
+let tabAddEnabled = true;
+let calcRowCount  = 0;
+let _lastCalcResult = null;
+let _presetPendingScope = null;
+let autoSaveTimer   = null;
+let autoSaveEnabled = false;
