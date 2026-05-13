@@ -104,10 +104,14 @@
         if (cells[j] !== undefined) el.value = cells[j];
       });
     });
-    // グレーアウト状態を更新
+    // グレーアウト・カテゴリ色・計算を全行更新（値セット後に再適用）
     trs.forEach(tr => {
       const nm = tr.querySelector('[data-field="nm"]');
-      if (nm) checkUnfilled(nm.id.replace('nm-', ''));
+      if (!nm) return;
+      const rowId = nm.id.replace('nm-', '');
+      checkUnfilled(rowId);
+      onCatChange(rowId);
+      onPay(parseInt(rowId));
     });
     updateTotals();
     updateRouteModeIcon();

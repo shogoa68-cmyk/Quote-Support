@@ -1,0 +1,4961 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>見積もり作成支援</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+  background: #f0f2f5;
+  padding: 24px;
+  color: #333;
+  font-size: 13px;
+}
+
+h1 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #2c3e50;
+  border-left: 4px solid #3498db;
+  padding-left: 12px;
+}
+
+.container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  overflow-x: auto;
+}
+
+/* ========== 見積もりヘッダー ========== */
+.quote-header {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: #f8f9fb;
+  border: 1px solid #dde3ea;
+  border-radius: 6px;
+}
+.quote-field { display: flex; flex-direction: column; gap: 4px; }
+.quote-field label {
+  font-size: 11px; font-weight: 600; color: #7f8c8d;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.quote-field input {
+  border: 1px solid #ccc; border-radius: 4px;
+  padding: 5px 9px; font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color 0.15s; background: #fff;
+}
+.quote-field input:focus { border-color: #3498db; }
+#qf-ref      { width: 130px; }
+#qf-customer { width: 200px; }
+#qf-person   { width: 110px; }
+
+/* ========== テーブル ========== */
+table { border-collapse: collapse; width: 100%; min-width: 1300px; }
+th, td {
+  border: 1px solid #ccc;
+  padding: 5px 7px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hd-base   { background: #2c3e50; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-pay    { background: #2980b9; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-bill   { background: #27ae60; color: #fff; font-weight: 600; font-size: 12px; }
+.hd-profit { background: #8e44ad; color: #fff; font-weight: 600; font-size: 12px; }
+
+/* ドラッグハンドル */
+.drag-handle {
+  cursor: grab;
+  color: #aaa;
+  font-size: 16px;
+  padding: 0 4px;
+  user-select: none;
+  line-height: 1;
+}
+.drag-handle:active { cursor: grabbing; }
+td.handle-cell {
+  width: 28px;
+  background: #f8f9fb;
+  padding: 3px 2px;
+}
+
+/* ドラッグ中の行スタイル */
+tr.dragging {
+  opacity: 0.4;
+  background: #eaf4fb !important;
+}
+tr.drag-over-top td {
+  border-top: 3px solid #3498db !important;
+}
+tr.drag-over-bottom td {
+  border-bottom: 3px solid #3498db !important;
+}
+
+/* 課税 */
+td.tax-cell { width: 44px; }
+input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #e74c3c; }
+tr.taxed td { background-color: rgba(231,76,60,0.06) !important; }
+tr.taxed td.profit-pos { background-color: #fde8e8 !important; }
+
+/* 入力共通 */
+input[type="text"],
+input[type="number"],
+select {
+  border: 1px solid #ccc; border-radius: 3px; padding: 3px 5px;
+  font-size: 12px; font-family: inherit; background: #fff;
+  outline: none; transition: border-color 0.15s;
+}
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus { border-color: #3498db; }
+input[type="number"] { text-align: right; }
+
+.w-name  { width: 130px; }
+.w-qty   { width: 58px; }
+.w-cur   { width: 62px; }
+.w-price { width: 90px; }
+.w-mkup  { width: 90px; }
+.w-note  { width: 130px; }
+.w-cat   { width: 98px; font-size: 11px; padding: 3px 4px; }
+
+/* 表示専用 */
+.display-field {
+  pointer-events: none !important;
+  cursor: default !important;
+  user-select: none !important;
+  background: #f4f4f4 !important;
+  border-color: #e0e0e0 !important;
+  color: #666 !important;
+}
+select.display-field { color: #666 !important; }
+
+/* CD セル */
+td.cd-cell { background: #f0f0f0; padding: 3px 5px; min-width: 100px; }
+td.cat-cell { padding: 2px 3px !important; width: 105px; }
+
+td.profit-cell { font-weight: bold; text-align: right; padding-right: 10px; min-width: 85px; }
+td.profit-pos  { background: #eafaf1; color: #1e8449; }
+td.profit-neg  { background: #fdf2f2; color: #c0392b; }
+td.profit-zero { background: #f5f5f5; color: #888; }
+
+tfoot td { background: #f5f6fa; font-weight: bold; font-size: 12px; }
+tfoot .profit-pos { background: #d5f5e3; }
+tfoot .profit-neg { background: #fadbd8; }
+tfoot .profit-zero{ background: #ebebeb; }
+
+/* ========== カテゴリー色分け ========== */
+tr.cat-domestic  td { background: #fff5ec !important; }
+tr.cat-ocean     td { background: #e8f4fd !important; }
+tr.cat-air       td { background: #eeeeff !important; }
+tr.cat-overseas  td { background: #edfaf3 !important; }
+tr.cat-surcharge td { background: #fafae6 !important; }
+tr.cat-customs   td { background: #f5ecff !important; }
+tr.cat-insurance td { background: #fff0f8 !important; }
+tr.cat-other     td { background: #f0f0f0 !important; }
+
+tr.cat-domestic  td.profit-pos { background: #ffd8b0 !important; }
+tr.cat-ocean     td.profit-pos { background: #b3d9f7 !important; }
+tr.cat-air       td.profit-pos { background: #c4c0ff !important; }
+tr.cat-overseas  td.profit-pos { background: #b8f0d1 !important; }
+tr.cat-surcharge td.profit-pos { background: #e8e8a0 !important; }
+tr.cat-customs   td.profit-pos { background: #dbb8ff !important; }
+tr.cat-insurance td.profit-pos { background: #ffb8e8 !important; }
+tr.cat-other     td.profit-pos { background: #c8c8c8 !important; }
+
+tr.cat-domestic:hover  td { background: #ffe5cc !important; }
+tr.cat-ocean:hover     td { background: #cce5f8 !important; }
+tr.cat-air:hover       td { background: #d8d5ff !important; }
+tr.cat-overseas:hover  td { background: #d0f5e5 !important; }
+tr.cat-surcharge:hover td { background: #f5f5c0 !important; }
+tr.cat-customs:hover   td { background: #e5d0ff !important; }
+tr.cat-insurance:hover td { background: #ffd0ef !important; }
+tr.cat-other:hover     td { background: #e0e0e0 !important; }
+
+/* ========== 未入力行グレーアウト ========== */
+tr.row-unfilled td { opacity: 0.38; }
+tr.row-unfilled:hover td { opacity: 0.65; }
+
+/* 非カテゴリ行のホバー */
+tbody tr:not([class*="cat-"]):hover td { background-color: rgba(52,152,219,0.04); }
+tbody tr:not([class*="cat-"]):hover td.cd-cell { background-color: #e8e8e8; }
+tbody tr:not([class*="cat-"]):hover td.handle-cell { background-color: #eef0f3; }
+tbody tr:not([class*="cat-"]):hover td.profit-pos { background-color: #c8f0d8; }
+tbody tr:not([class*="cat-"]):hover td.profit-neg { background-color: #f5cece; }
+
+.btn-del {
+  background: #e74c3c; color: white; border: none; border-radius: 3px;
+  cursor: pointer; padding: 3px 9px; font-size: 11px; transition: background 0.15s;
+}
+.btn-del:hover { background: #c0392b; }
+.btn-ins {
+  background: #27ae60; color: white; border: none; border-radius: 3px;
+  cursor: pointer; padding: 3px 9px; font-size: 11px;
+  transition: background 0.15s; margin-left: 4px;
+}
+.btn-ins:hover { background: #1e8449; }
+.btn-add {
+  display: inline-block; margin-top: 14px;
+  background: #3498db; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 9px 20px; font-size: 13px;
+  font-family: inherit; transition: background 0.15s;
+}
+.btn-add:hover { background: #2980b9; }
+.btn-reset {
+  display: inline-block; margin-top: 14px; margin-left: 10px;
+  background: #95a5a6; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 9px 16px; font-size: 13px;
+  font-family: inherit; transition: background 0.15s;
+}
+.btn-reset:hover { background: #7f8c8d; }
+.btn-preview {
+  display: inline-block; margin-top: 14px; margin-left: 10px;
+  background: #8e44ad; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 9px 20px; font-size: 13px;
+  font-family: inherit; transition: background 0.15s;
+}
+.btn-preview:hover { background: #7d3c98; }
+.btn-csv-import {
+  display: inline-block; margin-top: 14px; margin-left: 10px;
+  background: #e67e22; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 9px 20px; font-size: 13px;
+  font-family: inherit; transition: background 0.15s;
+}
+.btn-csv-import:hover { background: #d35400; }
+.btn-sort-cat {
+  display: inline-block; margin-top: 14px; margin-left: 10px;
+  background: #27ae60; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 9px 20px; font-size: 13px;
+  font-family: inherit; transition: background 0.15s;
+}
+.btn-sort-cat:hover { background: #1e8449; }
+
+/* CSV読み込みエリア */
+#csvDropZone {
+  display: none;
+  margin-top: 14px;
+  border: 2px dashed #e67e22;
+  border-radius: 6px;
+  padding: 18px;
+  text-align: center;
+  color: #e67e22;
+  font-size: 13px;
+  background: #fff8f3;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+#csvDropZone.active { background: #fde8d0; }
+#csvDropZone p { margin-top: 6px; font-size: 11px; color: #aaa; }
+
+#csvMsg {
+  display: none;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+#csvMsg.success { background: #eafaf1; color: #1e8449; display: block; }
+#csvMsg.error   { background: #fdf2f2; color: #c0392b; display: block; }
+
+/* ========== 引き合い条件 ========== */
+.condition-section {
+  margin-top: 24px;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+.condition-section h2 {
+  font-size: 15px;
+  color: #2c3e50;
+  border-left: 4px solid #16a085;
+  padding-left: 10px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.condition-section h2 .toggle-icon { font-size: 12px; color: #aaa; }
+
+.condition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 20px;
+  margin-bottom: 16px;
+}
+.cond-field { display: flex; flex-direction: column; gap: 5px; }
+.cond-field label {
+  font-size: 11px; font-weight: 600; color: #7f8c8d;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 4px;
+}
+.cond-field label .cond-icon { font-size: 13px; }
+.cond-field input,
+.cond-field select,
+.cond-field textarea {
+  border: 1px solid #ccc; border-radius: 4px;
+  padding: 6px 9px; font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color 0.15s; background: #fff;
+  color: #333;
+}
+.cond-field input:focus,
+.cond-field select:focus,
+.cond-field textarea:focus { border-color: #16a085; }
+
+.cond-divider {
+  grid-column: 1 / -1;
+  border: none;
+  border-top: 1px dashed #e0e5ec;
+  margin: 2px 0;
+}
+.cond-section-label {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 700;
+  color: #16a085;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: -4px;
+}
+
+/* ===== 輸送ルート マイルストーン ===== */
+.route-milestone-wrap {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+}
+.route-milestone {
+  display: flex;
+  align-items: flex-start;
+  padding: 18px 16px 16px;
+  background: #f6fbf9;
+  border: 1.5px solid #cde8e1;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin-top: 8px;
+  gap: 0;
+}
+/* ノード（各拠点） */
+.route-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 108px;
+}
+.route-node-badge {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  background: #e8f6f2;
+  border: 2.5px solid #16a085;
+  box-shadow: 0 2px 8px rgba(22,160,133,.18);
+  flex-shrink: 0;
+}
+.rn-badge-port {
+  background: #e8f0f8;
+  border-color: #2980b9;
+  box-shadow: 0 2px 8px rgba(41,128,185,.18);
+}
+.rn-badge-dest {
+  background: #fef5e8;
+  border-color: #e67e22;
+  box-shadow: 0 2px 8px rgba(230,126,34,.18);
+}
+.route-node-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c3e50;
+  text-align: center;
+  line-height: 1.2;
+}
+.route-node-sub {
+  font-size: 9px;
+  color: #95a5a6;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-top: -4px;
+  font-weight: 600;
+}
+.route-input {
+  width: 96px;
+  border: 1px solid #c8d6d2;
+  border-radius: 5px;
+  padding: 5px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  background: #fff;
+  color: #2c3e50;
+  transition: border-color .15s, box-shadow .15s;
+}
+.route-input:focus {
+  border-color: #16a085;
+  box-shadow: 0 0 0 2px rgba(22,160,133,.15);
+}
+.route-input::placeholder { color: #bdc3c7; font-size: 10px; }
+/* コネクター（区間矢印） */
+.route-connector {
+  flex: 1;
+  min-width: 28px;
+  max-width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 22px;   /* バッジ中心に揃える */
+  gap: 4px;
+  flex-shrink: 1;
+}
+.route-conn-track {
+  width: 100%;
+  height: 3px;
+  background: #bdc3c7;
+  border-radius: 2px;
+  position: relative;
+}
+.route-conn-track::after {
+  content: '';
+  position: absolute;
+  right: -6px; top: -4px;
+  border-top: 5.5px solid transparent;
+  border-bottom: 5.5px solid transparent;
+  border-left: 8px solid #bdc3c7;
+}
+.route-conn-icon {
+  font-size: 13px;
+  line-height: 1;
+  margin-top: 2px;
+}
+/* 主要区間（港間：海上/航空）─ 太く色付け */
+.route-conn-main .route-conn-track {
+  height: 4px;
+  background: linear-gradient(90deg, #2980b9 0%, #16a085 100%);
+}
+.route-conn-main .route-conn-track::after { border-left-color: #16a085; }
+.route-conn-main .route-conn-icon { font-size: 18px; }
+/* ─── ルートレイアウト切り替えボタン ─── */
+.route-milestone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.route-layout-toggle {
+  font-size: 11px;
+  padding: 3px 11px;
+  border: 1px solid #16a085;
+  border-radius: 12px;
+  background: transparent;
+  color: #16a085;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.route-layout-toggle:hover,
+.route-layout-toggle.active {
+  background: #16a085;
+  color: #fff;
+}
+
+/* ─── 縦レイアウト ─── */
+.route-milestone.vertical {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: visible;
+  gap: 0;
+  padding: 14px 16px;
+}
+
+/* 縦：ノードをグリッドカードに */
+.route-milestone.vertical .route-node {
+  display: grid;
+  grid-template-columns: 52px 88px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 3px;
+  align-items: center;
+  min-width: unset;
+  background: #fff;
+  border: 1px solid #d5e8e2;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.route-milestone.vertical .route-node-badge {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: center;
+  justify-self: center;
+}
+.route-milestone.vertical .route-node-name {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: left;
+  font-size: 12px;
+}
+.route-milestone.vertical .route-node-sub {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: left;
+  margin-top: 0;
+}
+/* 入力欄1つ目 */
+.route-milestone.vertical .route-input:not(.route-input-country):not(.route-input-wh-type) {
+  grid-column: 3;
+  grid-row: 1;
+  width: 100%;
+  max-width: none;
+  text-align: left;
+}
+/* 入力欄2つ目（国名・作業種別） */
+.route-milestone.vertical .route-input-country,
+.route-milestone.vertical .route-input-wh-type {
+  grid-column: 3;
+  grid-row: 2;
+  width: 100%;
+  max-width: none;
+  text-align: left;
+}
+
+/* 縦：コネクターを縦線に */
+.route-milestone.vertical .route-connector {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 0 0 39px;   /* バッジ中心に揃える: 16px(wrap padding)+14px(card padding)+24px(badge半径)−15px */
+  min-width: unset;
+  max-width: unset;
+  flex: none;
+  height: 44px;
+  gap: 10px;
+}
+.route-milestone.vertical .route-conn-track {
+  width: 3px;
+  height: 100%;
+  background: #bdc3c7;
+  border-radius: 2px;
+  position: relative;
+  flex-shrink: 0;
+}
+/* 横レイアウトの右向き矢印を上書き → 下向きに */
+.route-milestone.vertical .route-conn-track::after {
+  border-top: 8px solid #bdc3c7;
+  border-left: 5.5px solid transparent;
+  border-right: 5.5px solid transparent;
+  border-bottom: none;
+  top: auto;
+  bottom: -6px;
+  right: auto;
+  left: -4px;
+}
+.route-milestone.vertical .route-conn-icon {
+  margin-top: 0;
+  font-size: 14px;
+}
+.route-milestone.vertical .route-conn-carrier {
+  margin-top: 0;
+  max-width: 130px;
+  text-align: left;
+}
+/* 縦：メイン区間（太め・グラデーション） */
+.route-milestone.vertical .route-conn-main .route-conn-track {
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #2980b9 0%, #16a085 100%);
+}
+.route-milestone.vertical .route-conn-main .route-conn-track::after {
+  border-top-color: #16a085;
+}
+.route-milestone.vertical .route-conn-main .route-conn-icon { font-size: 18px; }
+
+/* ─── インコタームズ責任ゾーン（縦レイアウト） ─── */
+/* 売り手責任ノード */
+.route-milestone.vertical .route-node.rn-seller {
+  border-left: 4px solid #16a085;
+  background: linear-gradient(to right, #e8f8f5 0%, #fff 30%);
+}
+/* 責任移転ポイント */
+.route-milestone.vertical .route-node.rn-transfer {
+  border-left: 4px solid #e67e22;
+  background: linear-gradient(to right, #fef5e7 0%, #fff 30%);
+  position: relative;
+}
+/* 買い手責任ノード */
+.route-milestone.vertical .route-node.rn-buyer {
+  border-left: 4px solid #2980b9;
+  background: linear-gradient(to right, #ebf5fb 0%, #fff 30%);
+}
+/* 保険区間ノード（dottedアクセント） */
+.route-milestone.vertical .route-node.rn-insured {
+  outline: 2px dashed #2471a3;
+  outline-offset: -2px;
+}
+/* 横レイアウト用責任ゾーン（上ボーダー） */
+.route-milestone:not(.vertical) .route-node.rn-seller { border-top: 3px solid #16a085; }
+.route-milestone:not(.vertical) .route-node.rn-transfer { border-top: 3px solid #e67e22; }
+.route-milestone:not(.vertical) .route-node.rn-buyer   { border-top: 3px solid #2980b9; }
+.route-milestone:not(.vertical) .route-node.rn-insured { outline: 2px dashed #2471a3; outline-offset: -2px; }
+
+/* インコタームズ情報バー */
+.incoterms-info-bar {
+  display: none;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: #f8f9fb;
+  border: 1px solid #d5e8e2;
+  border-radius: 6px;
+  padding: 7px 12px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.incoterms-info-bar.visible { display: flex; }
+.inc-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #1a5276; color: #fff; font-weight: 700;
+  padding: 2px 10px; border-radius: 10px; font-size: 12px;
+  letter-spacing: .04em;
+}
+.inc-zone-seller { color: #16a085; font-weight: 600; }
+.inc-zone-buyer  { color: #2980b9; font-weight: 600; }
+.inc-transfer    { color: #e67e22; font-weight: 600; }
+.inc-insurance   { color: #2471a3; font-weight: 600; }
+.inc-sep { color: #bdc3c7; }
+.inc-legend { display: flex; gap: 8px; flex-wrap: wrap; margin-left: 4px; }
+.inc-legend-item { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #666; }
+.inc-legend-item::before { content: ''; display: inline-block; width: 10px; height: 3px; border-radius: 2px; }
+.inc-legend-item.seller::before { background: #16a085; }
+.inc-legend-item.transfer::before { background: #e67e22; }
+.inc-legend-item.buyer::before { background: #2980b9; }
+.inc-legend-item.insured::before { border: 1.5px dashed #2471a3; height: 0; }
+
+/* 保険区間表示バー */
+.insurance-info-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #eaf4fb;
+  border: 1px dashed #2471a3;
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #1a5276;
+}
+.insurance-info-bar.visible { display: flex; }
+.ins-label { font-weight: 700; }
+.ins-range { color: #2980b9; font-weight: 600; }
+
+/* 国名フィールド（起点・終点） */
+.route-input-country {
+  background: #f0f9f6;
+  border-color: #a8d5c8;
+  font-size: 10px;
+  padding: 3px 6px;
+  color: #2c7a6a;
+}
+.route-input-country:focus { border-color: #16a085; box-shadow: 0 0 0 2px rgba(22,160,133,.12); }
+.route-input-country::placeholder { color: #90c4b8; font-size: 9px; }
+/* 運送人フィールド（コネクター内） */
+.route-conn-carrier {
+  width: 100%;
+  max-width: 80px;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-size: 10px;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  background: #fff;
+  color: #2c3e50;
+  margin-top: 3px;
+  transition: border-color .15s;
+}
+.route-conn-carrier:focus { border-color: #16a085; box-shadow: 0 0 0 2px rgba(22,160,133,.12); }
+.route-conn-carrier::placeholder { color: #bdc3c7; font-size: 8.5px; }
+/* 倉庫ノードバッジ */
+.rn-badge-wh {
+  background: #fef9e7;
+  border-color: #f39c12;
+  box-shadow: 0 2px 8px rgba(243,156,18,.18);
+}
+/* 倉庫作業種別セレクト */
+.route-input-wh-type {
+  width: 96px;
+  border: 1px solid #f5cba7;
+  border-radius: 5px;
+  padding: 4px 5px;
+  font-size: 10px;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+  color: #2c3e50;
+  text-align: center;
+  cursor: pointer;
+}
+.route-input-wh-type:focus { border-color: #f39c12; box-shadow: 0 0 0 2px rgba(243,156,18,.15); }
+
+/* ===== 作業範囲セレクター ===== */
+.scope-selector-wrap {
+  background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+  border-radius: 8px;
+  padding: 14px 18px 12px;
+  margin-bottom: 18px;
+}
+.scope-selector-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 9px;
+}
+/* ---- 引き合い条件 最上位バー ---- */
+.cond-primary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.cond-prim-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cond-prim-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7f8c9a;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.cond-prim-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cond-prim-btn {
+  padding: 8px 18px;
+  border-radius: 7px;
+  border: 2px solid #c8d6e5;
+  background: #fff;
+  color: #4a5568;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color .15s, background .15s, color .15s;
+  white-space: nowrap;
+}
+.cond-prim-btn:hover {
+  border-color: #16a085;
+  color: #16a085;
+}
+.cond-prim-btn.active {
+  border-color: #16a085;
+  background: #16a085;
+  color: #fff;
+}
+/* ---- スコープ拡張オプション ---- */
+/* opt-hidden: 非表示（梱包ノードなど） */
+.opt-hidden { display: none !important; }
+/* opt-extended: 通常スコープ外のオプション表示（点線枠） */
+.route-node.rn-opt-extended {
+  border-style: dashed !important;
+  opacity: 0.85;
+}
+.route-node.rn-opt-extended::after {
+  content: 'オプション';
+  display: block;
+  font-size: 9px;
+  color: #e67e22;
+  font-weight: 700;
+  margin-top: 3px;
+  letter-spacing: .04em;
+}
+/* 梱包ノードのバッジ色 */
+.rn-badge-pack {
+  background: #f39c12 !important;
+  color: #fff !important;
+}
+/* ---- マイルストーン ゾーン背景色 ---- */
+.route-node { position: relative; }
+
+/* 輸出地ノード（アンバー系） */
+.rn-zone-origin {
+  background: linear-gradient(135deg, #fef9e7 0%, #fdebd0 100%) !important;
+  border-left: 4px solid #e67e22 !important;
+}
+/* 輸入地ノード（ブルー系） */
+.rn-zone-dest {
+  background: linear-gradient(135deg, #ebf5fb 0%, #d6eaf8 100%) !important;
+  border-left: 4px solid #2980b9 !important;
+}
+
+/* ノード非表示（✕）ボタン */
+.node-hide-btn {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  background: none;
+  border: 1px solid transparent;
+  color: #ccc;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: background .12s, color .12s, border-color .12s;
+  z-index: 1;
+}
+.node-hide-btn:hover {
+  background: #fdecea;
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+/* 通関ノードのバッジ色 */
+.rn-badge-customs {
+  background: #8e44ad !important;
+  color: #fff !important;
+}
+
+/* FCL/LCL サブボタン */
+.cond-sub-btns {
+  display: flex;
+  gap: 4px;
+}
+.cond-sub-btn {
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1.5px solid #c8d6e5;
+  background: #fff;
+  color: #7f8c9a;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.cond-sub-btn.active {
+  border-color: #2471a3;
+  background: #2471a3;
+  color: #fff;
+}
+/* インコタームズ行 */
+.cond-inco-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cond-inco-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e50;
+  white-space: nowrap;
+}
+.cond-inco-bar select {
+  padding: 6px 10px;
+  border: 1.5px solid #c8d6e5;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #1e2d40;
+  color: #ecf0f1;
+  cursor: pointer;
+  outline: none;
+}
+.cond-inco-bar select:focus { border-color: #16a085; }
+.cond-inco-bar select option { background: #2c3e50; color: #ecf0f1; }
+.cond-inco-bar select optgroup { background: #1a252f; color: #7f8c9a; font-style: normal; }
+
+.scope-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.scope-btn {
+  padding: 6px 15px;
+  border: 1.5px solid #4a6278;
+  border-radius: 20px;
+  background: transparent;
+  color: #95a5a6;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.scope-btn:hover {
+  border-color: #16a085;
+  color: #16a085;
+  background: rgba(22,160,133,.1);
+}
+.scope-btn.active {
+  border-color: #16a085;
+  background: #16a085;
+  color: #fff;
+  font-weight: 700;
+}
+.scope-hint {
+  font-size: 11px;
+  color: #7f8c8d;
+  margin: 8px 0 0;
+  min-height: 14px;
+  line-height: 1.5;
+}
+/* 倉庫オプショントグル */
+.wh-toggle-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+/* インコタームズ・輸送モード（作業範囲セクション内横並び） */
+.scope-inline-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.scope-inline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 160px;
+}
+.scope-inline-field label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7f9aaa;
+  letter-spacing: .04em;
+}
+.scope-inline-field select {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 6px;
+  color: #d0dde5;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.scope-inline-field select:focus { border-color: #16a085; }
+.scope-inline-field select option { background: #2c3e50; color: #ecf0f1; }
+.scope-inline-field select optgroup { background: #1a252f; color: #7f8c8d; font-style: normal; }
+.wh-toggle-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #5d7180;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.wh-toggle-btn {
+  padding: 5px 14px;
+  border: 1.5px dashed #556a7a;
+  border-radius: 20px;
+  background: transparent;
+  color: #8fa8b8;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.wh-toggle-btn:hover {
+  border-color: #f39c12;
+  color: #f39c12;
+  border-style: solid;
+  background: rgba(243,156,18,.06);
+}
+.wh-toggle-btn.active {
+  border-color: #f39c12;
+  border-style: solid;
+  background: rgba(243,156,18,.15);
+  color: #f39c12;
+  font-weight: 700;
+}
+.wh-toggle-desc {
+  font-size: 10px;
+  color: #f39c12;
+  font-style: italic;
+  min-height: 14px;
+}
+/* フィールド非表示（スコープ外） */
+.scope-hidden {
+  display: none !important;
+}
+
+.cond-free { margin-top: 6px; }
+.cond-free label {
+  font-size: 11px; font-weight: 600; color: #7f8c8d;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  display: block; margin-bottom: 6px;
+}
+#condFreeText {
+  width: 100%; min-height: 80px;
+  border: 1px solid #ccc; border-radius: 4px;
+  padding: 8px 10px; font-size: 12px; font-family: inherit;
+  line-height: 1.8; resize: vertical; outline: none;
+  transition: border-color 0.15s;
+}
+#condFreeText:focus { border-color: #16a085; }
+
+.cond-actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn-cond-clear {
+  background: #ecf0f1; color: #7f8c8d; border: none; border-radius: 4px;
+  padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-cond-clear:hover { background: #bdc3c7; color: #2c3e50; }
+
+/* ========== サイズ計算 ========== */
+.calc-wrapper {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  overflow-x: auto;          /* はみ出しを横スクロールで対応 */
+  -webkit-overflow-scrolling: touch;
+}
+.calc-mini-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+  min-width: 480px;          /* 最低幅を確保してレイアウト崩れを防ぐ */
+}
+.calc-mini-table th {
+  background: #f0f4f8;
+  border: 1px solid #cdd6de;
+  padding: 5px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  text-align: center;
+  white-space: nowrap;
+}
+.calc-mini-table td {
+  border: 1px solid #dde3ea;
+  padding: 3px 3px;
+  text-align: center;
+}
+.calc-mini-table input[type="number"] {
+  width: 68px;
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+.calc-mini-table input[type="number"]:focus { border-color: #3498db; }
+.cbm-result {
+  color: #2980b9;
+  font-weight: 700;
+  text-align: right;
+  padding-right: 8px;
+  min-width: 80px;
+  font-size: 12px;
+}
+.btn-calc-add {
+  margin-top: 6px;
+  background: #ecf0f1;
+  color: #555;
+  border: 1px solid #bcc4cc;
+  border-radius: 3px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-calc-add:hover { background: #d5dde5; }
+.btn-calc-row-del {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.btn-calc-run {
+  display: inline-block;
+  margin-top: 8px;
+  margin-left: 6px;
+  background: #2980b9;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-calc-run:hover { background: #1a6fa8; }
+.calc-results-panel {
+  display: none;
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: #f0f8ff;
+  border: 1px solid #b8d8f8;
+  border-radius: 6px;
+}
+.calc-results-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-bottom: 6px;
+}
+.calc-result-item { display: flex; flex-direction: column; gap: 2px; }
+.calc-r-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.calc-r-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+.calc-r-val.hl-blue   { color: #2980b9; }
+.calc-r-val.hl-green  { color: #27ae60; }
+.calc-r-val.hl-orange { color: #e67e22; }
+
+.calc-divider-line {
+  border: none;
+  border-top: 1px dashed #b8d8f8;
+  margin: 8px 0;
+}
+.calc-reflect-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2980b9;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.calc-reflect-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.calc-reflect-lbl {
+  min-width: 160px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #34495e;
+}
+.calc-row-select {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  max-width: 200px;
+}
+.calc-row-select:focus { border-color: #2980b9; }
+.btn-do-reflect {
+  background: #e67e22;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-do-reflect:hover { background: #d35400; }
+
+/* プレビュー内：引き合い条件 */
+#pvCondBox {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  background: #f0faf8;
+  border: 1px solid #a8d8ce;
+  border-radius: 5px;
+  font-size: 12px;
+}
+#pvCondBox strong {
+  display: block;
+  font-size: 12px;
+  color: #0e6655;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #a8d8ce;
+}
+.pv-cond-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 16px;
+}
+.pv-cond-item { display: flex; gap: 6px; font-size: 12px; }
+.pv-cond-lbl { color: #7f8c8d; font-weight: 600; white-space: nowrap; }
+.pv-cond-val { color: #2c3e50; }
+.pv-cond-free {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed #a8d8ce;
+  font-size: 12px; color: #2c3e50;
+  white-space: pre-wrap; line-height: 1.7;
+}
+
+/* ========== リマーク欄 ========== */
+.remark-section {
+  margin-top: 24px;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+.remark-section h2 {
+  font-size: 15px;
+  color: #2c3e50;
+  border-left: 4px solid #e67e22;
+  padding-left: 10px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.remark-section h2 .toggle-icon { font-size: 12px; color: #aaa; }
+
+.remark-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.preset-btn {
+  background: #f0f4f8;
+  border: 1px solid #c8d6e5;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #34495e;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.preset-btn:hover  { background: #dce8f5; border-color: #3498db; color: #2980b9; }
+.preset-btn.active { background: #d6eaf8; border-color: #3498db; color: #1a5276; font-weight: 600; }
+
+.remark-body { display: flex; flex-direction: column; gap: 10px; }
+#remarkTextarea {
+  width: 100%;
+  min-height: 140px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.8;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  color: #333;
+}
+#remarkTextarea:focus { border-color: #e67e22; }
+.remark-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn-remark-clear {
+  background: #ecf0f1; color: #7f8c8d; border: none; border-radius: 4px;
+  padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-remark-clear:hover { background: #bdc3c7; color: #2c3e50; }
+.remark-char { font-size: 11px; color: #bbb; margin-left: auto; }
+
+#pvRemarkBox {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #fffdf5;
+  border: 1px solid #f0d9a0;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #5d4e00;
+  white-space: pre-wrap;
+}
+#pvRemarkBox strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #7d5a00;
+  border-bottom: 1px solid #f0d9a0;
+  padding-bottom: 4px;
+}
+
+.tip { font-size: 11px; color: #888; margin-top: 10px; line-height: 1.8; }
+.tip b { color: #27ae60; }
+.tip b.red { color: #e74c3c; }
+.tip b.gray { color: #7f8c8d; }
+.tip b.blue { color: #3498db; }
+.tip b.purple { color: #8e44ad; }
+
+/* ========== プレビューモーダル ========== */
+#previewOverlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55); z-index: 1000;
+  justify-content: center; align-items: flex-start;
+  padding: 30px 20px; overflow-y: auto;
+}
+#previewOverlay.open { display: flex; }
+#previewBox {
+  background: #fff; border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+  padding: 28px 30px 24px; width: 100%; max-width: 1040px;
+}
+#previewBox h2 {
+  font-size: 16px; color: #2c3e50; margin-bottom: 16px;
+  border-left: 4px solid #8e44ad; padding-left: 10px;
+}
+.pv-meta {
+  display: flex; gap: 24px; flex-wrap: wrap; font-size: 12px;
+  margin-bottom: 14px; padding: 10px 14px;
+  background: #f8f9fb; border-radius: 5px; border: 1px solid #e0e5ec;
+}
+.pv-meta-item { display: flex; gap: 6px; align-items: center; }
+.pv-meta-item .lbl { color: #888; font-weight: 600; }
+.pv-meta-item .val { color: #2c3e50; font-weight: 500; }
+
+#previewTableWrap { overflow-x: auto; }
+#previewTable {
+  border-collapse: collapse; width: 100%; min-width: 880px;
+  font-size: 12px; user-select: text;
+}
+#previewTable th {
+  background: #2c3e50; color: #fff; border: 1px solid #aaa;
+  padding: 6px 10px; font-weight: 600;
+}
+#previewTable th.ph-pay    { background: #2980b9; }
+#previewTable th.ph-bill   { background: #27ae60; }
+#previewTable th.ph-profit { background: #8e44ad; }
+#previewTable td { border: 1px solid #ccc; padding: 5px 10px; text-align: center; }
+#previewTable td.pv-name { text-align: left; min-width: 120px; }
+#previewTable td.pv-num  { text-align: right; }
+#previewTable td.pv-cd   { text-align: right; background: #f0f0f0; color: #666; }
+#previewTable td.pv-pr   { text-align: right; font-weight: bold; }
+#previewTable td.pv-pos  { background: #eafaf1; color: #1e8449; }
+#previewTable td.pv-neg  { background: #fdf2f2; color: #c0392b; }
+#previewTable td.pv-zero { background: #f5f5f5; color: #888; }
+#previewTable tr.pv-total td { background: #f5f6fa; font-weight: bold; }
+#previewTable tr.pv-total td.pv-pos { background: #d5f5e3; }
+#previewTable tr.pv-total td.pv-neg { background: #fadbd8; }
+#previewTable td.pv-taxed { color: #e74c3c; }
+
+.pv-btns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+.pv-btn-copy {
+  background: #27ae60; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+  transition: background 0.15s;
+}
+.pv-btn-copy:hover { background: #1e8449; }
+.pv-btn-csv {
+  background: #2980b9; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+  transition: background 0.15s;
+}
+.pv-btn-csv:hover { background: #1a6fa8; }
+.pv-btn-close {
+  background: #95a5a6; color: white; border: none; border-radius: 5px;
+  cursor: pointer; padding: 8px 18px; font-size: 13px; font-family: inherit;
+  transition: background 0.15s;
+}
+.pv-btn-close:hover { background: #7f8c8d; }
+.pv-copy-msg { font-size: 12px; color: #27ae60; opacity: 0; transition: opacity 0.4s; }
+.pv-copy-msg.show { opacity: 1; }
+.pv-hint { font-size: 11px; color: #999; margin-top: 10px; }
+
+/* ========== 保存ツールバー ========== */
+.save-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #1a252f;
+  padding: 8px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  border-bottom: 2px solid #16a085;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+.save-toolbar-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7f9aaa;
+  letter-spacing: .06em;
+  margin-right: 4px;
+}
+.save-btn {
+  padding: 5px 13px;
+  border: 1.5px solid;
+  border-radius: 14px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.save-btn-save      { border-color:#16a085; color:#16a085; }
+.save-btn-save:hover{ background:#16a085; color:#fff; }
+.save-btn-load      { border-color:#2980b9; color:#2980b9; }
+.save-btn-load:hover{ background:#2980b9; color:#fff; }
+.save-btn-clear-save{ border-color:#e74c3c; color:#e74c3c; }
+.save-btn-clear-save:hover{ background:#e74c3c; color:#fff; }
+.save-btn-export { border-color:#2980b9; color:#2980b9; }
+.save-btn-export:hover{ background:#2980b9; color:#fff; }
+.save-btn-import { border-color:#27ae60; color:#27ae60; }
+.save-btn-import:hover{ background:#27ae60; color:#fff; }
+/* ---- toolbar 2-section layout ---- */
+.save-toolbar-sep {
+  width: 1px; height: 26px;
+  background: #c0cfe0;
+  margin: 0 10px;
+  align-self: center;
+  flex-shrink: 0;
+}
+.save-toolbar-label {
+  font-size: 10px; font-weight: 700;
+  color: #7f8c9a;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+/* ---- inco-hidden / mode-hidden: 連動非表示 ---- */
+.inco-hidden,
+[data-inco-hidden="1"] { display: none !important; }
+.mode-hidden,
+[data-mode-hidden="1"] { display: none !important; }
+/* ---- 非表示バッジ（フィールドの代わりに表示） ---- */
+.hidden-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; color: #a0aab4;
+  padding: 2px 6px; border-radius: 4px;
+  background: #f0f4f8;
+  border: 1px dashed #c8d6e5;
+  white-space: nowrap;
+}
+.save-status {
+  font-size: 11px;
+  color: #16a085;
+  margin-left: 4px;
+  min-width: 120px;
+  opacity: 0;
+  transition: opacity .4s;
+}
+.save-status.show { opacity: 1; }
+.autosave-label {
+  font-size: 11px;
+  color: #7f9aaa;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.autosave-label input { cursor: pointer; }
+
+/* ========== ドラッグ並び替え ========== */
+.drag-handle {
+  color: #aaa;
+  font-size: 16px;
+  cursor: grab;
+  margin-right: 6px;
+  user-select: none;
+  padding: 0 4px;
+  transition: color .15s;
+}
+.drag-handle:hover { color: #16a085; }
+.drag-handle:active { cursor: grabbing; }
+.section-dragging {
+  opacity: .45;
+  outline: 2px dashed #16a085;
+}
+.section-drag-over {
+  outline: 2px solid #16a085;
+  background: rgba(22,160,133,.04);
+}
+
+/* ========== フィードバックFAB & モーダル ========== */
+.fb-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #16a085;
+  color: #fff;
+  font-size: 22px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.22);
+  z-index: 1000;
+  transition: background .15s, transform .1s;
+  line-height: 50px;
+  text-align: center;
+}
+.fb-fab:hover { background: #1abc9c; transform: scale(1.08); }
+#fbOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#fbBox {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 30px 22px;
+  width: min(480px, 92vw);
+  box-shadow: 0 8px 32px rgba(0,0,0,.22);
+}
+#fbBox h3 { font-size: 16px; color: #2c3e50; margin-bottom: 6px; }
+.fb-desc { font-size: 12px; color: #7f8c8d; margin-bottom: 16px; line-height: 1.6; }
+.fb-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.fb-field label { font-size: 11px; font-weight: 700; color: #7f8c8d; text-transform: uppercase; }
+.fb-field input, .fb-field textarea {
+  border: 1px solid #d5dde3;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+.fb-field input:focus, .fb-field textarea:focus { border-color: #16a085; box-shadow: 0 0 0 2px rgba(22,160,133,.12); }
+.fb-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.fb-btn-send  { background:#16a085; color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-family:inherit; cursor:pointer; transition:background .15s; }
+.fb-btn-send:hover { background:#1abc9c; }
+.fb-btn-close { background:#ecf0f1; color:#555; border:none; border-radius:6px; padding:8px 16px; font-size:13px; font-family:inherit; cursor:pointer; }
+.fb-btn-close:hover { background:#bdc3c7; }
+
+/* セクション説明 */
+.section-desc {
+  font-size: 11.5px;
+  color: #8a97a4;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+  padding: 6px 10px;
+  border-left: 3px solid #d9e4ef;
+  background: #f6f8fb;
+  border-radius: 0 4px 4px 0;
+}
+.section-desc b { color: #6a8098; font-weight: 600; }
+
+/* 反映フラッシュ */
+@keyframes flash-green {
+  0%   { background-color: #b8f0d1 !important; }
+  100% { background-color: inherit; }
+}
+.flash-reflect { animation: flash-green 0.9s ease-out; }
+
+/* ========== トースト通知 ========== */
+#toast-container {
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: #2c3e50;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.28);
+  opacity: 0;
+  transform: translateX(60px);
+  transition: opacity .28s, transform .28s;
+  pointer-events: none;
+  max-width: 300px;
+  line-height: 1.5;
+}
+.toast.visible { opacity: 1; transform: translateX(0); }
+.toast.success { border-left: 4px solid #27ae60; }
+.toast.info    { border-left: 4px solid #3498db; }
+.toast.warning { border-left: 4px solid #e67e22; }
+.toast.error   { border-left: 4px solid #e74c3c; }
+
+/* ========== コマンドパレット ========== */
+#cmdPalette {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  background: rgba(0,0,0,.45);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+}
+#cmdPalette.open { display: flex; }
+#cmdPaletteBox {
+  background: #fff;
+  border-radius: 10px;
+  width: min(560px, 92vw);
+  box-shadow: 0 12px 48px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+#cmdInput {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #e0e5ec;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  color: #2c3e50;
+  background: #f8f9fb;
+}
+#cmdInput::placeholder { color: #bdc3c7; }
+#cmdList { max-height: 340px; overflow-y: auto; padding: 6px 0; }
+.cmd-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #2c3e50;
+  transition: background .1s;
+}
+.cmd-item:hover, .cmd-item.active { background: #ebf5fb; }
+.cmd-icon  { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; }
+.cmd-label { flex: 1; font-weight: 500; }
+.cmd-sub   { font-size: 11px; color: #95a5a6; margin-top: 1px; }
+.cmd-empty { padding: 20px; text-align: center; font-size: 13px; color: #aaa; }
+.cmd-palette-hint {
+  padding: 8px 18px;
+  font-size: 11px;
+  color: #aaa;
+  border-top: 1px solid #f0f4f8;
+  background: #fafafa;
+}
+
+/* ========== プリセット管理 ========== */
+/* ---- スコーププリセットダイアログ ---- */
+.scope-preset-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 7000;
+  background: rgba(0,0,0,.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.scope-preset-modal.open { display: flex; }
+.scope-preset-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px 28px 20px;
+  width: min(480px, 94vw);
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+.scope-preset-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 6px;
+}
+.scope-preset-desc {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+.scope-preset-items {
+  font-size: 11px;
+  color: #555;
+  background: #f8f9fa;
+  border: 1px solid #e0e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  line-height: 1.8;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.scope-preset-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.scope-preset-btn {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: 1.5px solid;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+}
+.scope-preset-btn-replace {
+  border-color: #e74c3c; color: #e74c3c; background: #fff;
+}
+.scope-preset-btn-replace:hover { background: #e74c3c; color: #fff; }
+.scope-preset-btn-append {
+  border-color: #27ae60; color: #27ae60; background: #fff;
+}
+.scope-preset-btn-append:hover { background: #27ae60; color: #fff; }
+.scope-preset-btn-skip {
+  border-color: #95a5a6; color: #95a5a6; background: #fff;
+}
+.scope-preset-btn-skip:hover { background: #95a5a6; color: #fff; }
+
+.preset-mgr-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  background: rgba(0,0,0,.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.preset-mgr-modal.open { display: flex; }
+.preset-mgr-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px 26px 20px;
+  width: min(500px, 94vw);
+  box-shadow: 0 8px 32px rgba(0,0,0,.22);
+}
+.preset-mgr-box h3 { font-size: 15px; color: #2c3e50; margin-bottom: 6px; }
+.preset-mgr-desc { font-size: 12px; color: #7f8c8d; margin-bottom: 14px; line-height: 1.6; }
+.preset-save-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.preset-name-input {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+.preset-name-input:focus { border-color: #16a085; }
+.btn-preset-save-new {
+  background: #16a085; color: #fff; border: none; border-radius: 5px;
+  padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: inherit;
+  transition: background .15s; white-space: nowrap;
+}
+.btn-preset-save-new:hover { background: #1abc9c; }
+.preset-list-wrap {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e0e5ec;
+  border-radius: 5px;
+  margin-bottom: 14px;
+}
+.preset-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #f0f4f8;
+  font-size: 13px;
+}
+.preset-list-item:last-child { border-bottom: none; }
+.preset-list-name { flex: 1; color: #2c3e50; font-weight: 500; }
+.preset-list-ts   { font-size: 11px; color: #aaa; white-space: nowrap; }
+.btn-preset-load {
+  background: #2980b9; color: #fff; border: none; border-radius: 4px;
+  padding: 4px 10px; font-size: 11px; cursor: pointer; transition: background .15s;
+  white-space: nowrap;
+}
+.btn-preset-load:hover { background: #1a6fa8; }
+.btn-preset-del {
+  background: none; color: #e74c3c; border: none; font-size: 15px;
+  cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.btn-preset-del:hover { color: #c0392b; }
+.preset-empty { padding: 16px; text-align: center; font-size: 13px; color: #aaa; }
+.preset-mgr-footer { display: flex; justify-content: flex-end; }
+.btn-preset-close {
+  background: #ecf0f1; color: #555; border: none; border-radius: 5px;
+  padding: 7px 16px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-preset-close:hover { background: #bdc3c7; }
+
+/* ========== 処理済みマーク ========== */
+.done-btn {
+  background: none;
+  border: 1.5px solid #bdc3c7;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #bdc3c7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+  padding: 0;
+  line-height: 1;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+.done-btn:hover { border-color: #27ae60; color: #27ae60; }
+.done-btn.done  { border-color: #27ae60; background: #27ae60; color: #fff; }
+tr.row-done td  { opacity: 0.52; }
+
+/* ========== レスポンシブ（Notion埋め込み・狭い画面対応） ========== */
+@media (max-width: 680px) {
+  body { padding: 10px; }
+  .save-toolbar { padding: 6px 10px; gap: 5px; flex-wrap: wrap; }
+  .save-btn     { padding: 4px 9px; font-size: 11px; }
+  h1            { font-size: 15px; }
+  .container    { padding: 10px; overflow-x: auto; }
+  .condition-grid { grid-template-columns: 1fr 1fr; }
+  .scope-btns   { gap: 5px; }
+  .scope-btn    { padding: 5px 10px; font-size: 11px; }
+  #previewBox   { padding: 16px 14px; }
+  .quote-header { flex-direction: column; gap: 8px; }
+  #qf-ref, #qf-customer, #qf-person { width: 100%; }
+  .pv-btns { flex-wrap: wrap; }
+}
+</style>
+
+</head>
+<body>
+
+<!-- ========== 保存/読み込みツールバー ========== -->
+<div class="save-toolbar" id="saveToolbar">
+  <!-- ─ 一時保存グループ ─ -->
+  <span class="save-toolbar-label">💾 一時保存</span>
+  <button class="save-btn save-btn-save" onclick="saveData()" title="現在のデータをブラウザに保存">
+    💾 保存
+  </button>
+  <button class="save-btn save-btn-load" onclick="loadData()" title="保存データを読み込む">
+    📂 読み込み
+  </button>
+  <button class="save-btn save-btn-clear-save" onclick="clearSavedData()" title="保存データを削除">
+    🗑️ 削除
+  </button>
+  <button class="save-btn" style="border-color:#8e44ad;color:#8e44ad;"
+          onclick="openPresetMgr()" title="よく使うパターンを保存・呼び出し">
+    📂 プリセット
+  </button>
+  <label class="autosave-label">
+    <input type="checkbox" id="autoSaveChk" onchange="toggleAutoSave(this.checked)" />
+    自動保存
+  </label>
+  <!-- ─ セクション区切り ─ -->
+  <span class="save-toolbar-sep"></span>
+  <!-- ─ ファイル入出力グループ ─ -->
+  <span class="save-toolbar-label">📁 ファイル</span>
+  <button class="save-btn save-btn-export" onclick="exportToFile()" title="見積データをJSONファイルに出力">
+    📤 出力
+  </button>
+  <button class="save-btn save-btn-import" onclick="document.getElementById('importFileInput').click()" title="JSONファイルから見積データを読み込む">
+    📥 読込
+  </button>
+  <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importFromFile(event)" />
+  <span class="save-status" id="saveStatus"></span>
+</div>
+
+<!-- ========== フィードバックモーダル ========== -->
+<div id="fbOverlay" onclick="closeFeedback(event)" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:3000; display:none;">
+  <div id="fbBox" onclick="event.stopPropagation()">
+    <h3>💬 フィードバック</h3>
+    <p class="fb-desc">ご要望・バグ報告・改善案をお聞かせください。<br>「送信」でメールクライアントが開きます。</p>
+    <div class="fb-field">
+      <label>件名</label>
+      <input type="text" id="fbSubject" value="【見積支援ツール】フィードバック" />
+    </div>
+    <div class="fb-field">
+      <label>内容</label>
+      <textarea id="fbBody" placeholder="例）〇〇機能を追加してほしい / 〇〇のとき動作がおかしい" rows="6"></textarea>
+    </div>
+    <div class="fb-btns">
+      <button class="fb-btn-send"  onclick="sendFeedback()">✉️ メールで送信</button>
+      <button class="fb-btn-close" onclick="closeFeedback()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== フィードバックFAB ========== -->
+<button class="fb-fab" onclick="openFeedback()" title="フィードバックを送る">💬</button>
+
+
+<!-- ========== トースト通知コンテナ ========== -->
+<div id="toast-container"></div>
+
+<!-- ========== コマンドパレット (Ctrl+K) ========== -->
+<div id="cmdPalette" onclick="if(event.target===this)closeCmdPalette()">
+  <div id="cmdPaletteBox">
+    <input id="cmdInput" type="text"
+      placeholder="🔍 コマンド名・セクション名を入力..."
+      oninput="filterCmd()" onkeydown="cmdKeydown(event)" autocomplete="off" />
+    <div id="cmdList"></div>
+    <div class="cmd-palette-hint">↑↓ で移動　Enter で実行　Esc で閉じる</div>
+  </div>
+</div>
+
+<!-- ========== プリセット管理モーダル ========== -->
+<div class="preset-mgr-modal" id="presetMgrModal"
+     onclick="if(event.target===this)closePresetMgr()">
+  <div class="preset-mgr-box">
+    <h3>📂 プリセット管理</h3>
+    <p class="preset-mgr-desc">
+      よく使う入力パターンを名前付きで保存しておけます。<br>
+      「輸入案件用」「国内配送用」など用途ごとに保存するとすぐ呼び出せます（最大10件）。
+    </p>
+    <div class="preset-save-row">
+      <input type="text" class="preset-name-input" id="presetNameInput"
+             placeholder="例）輸入案件用・国内配送用" maxlength="30"
+             onkeydown="if(event.key==='Enter')savePreset()" />
+      <button class="btn-preset-save-new" onclick="savePreset()">💾 現在の状態を保存</button>
+    </div>
+    <div class="preset-list-wrap" id="presetListWrap">
+      <div class="preset-empty">保存済みのプリセットはありません</div>
+    </div>
+    <div class="preset-mgr-footer">
+      <button class="btn-preset-close" onclick="closePresetMgr()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<h1>見積もり作成支援ページ</h1>
+
+<!-- ① 管理番号入力 -->
+<div class="condition-section" id="section-ref" draggable="true">
+  <h2 onclick="toggleSection('refBody','refToggle')">
+    <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+    🗂️ 管理番号入力
+    <span class="toggle-icon" id="refToggle">▼</span>
+  </h2>
+  <div id="refBody">
+    <p class="section-desc">案件を管理するための識別情報を入力します。<b>仮 REF #</b> は見積もり番号や問い合わせ番号など任意の形式で OK。後でフィルタリングや整理に使えます。</p>
+    <div class="quote-header">
+      <div class="quote-field">
+        <label>仮 REF #</label>
+        <input type="text" id="qf-ref" placeholder="例）2024-001" />
+      </div>
+      <div class="quote-field">
+        <label>引き合い元名称</label>
+        <input type="text" id="qf-customer" placeholder="例）○○商事" />
+      </div>
+      <div class="quote-field">
+        <label>担当</label>
+        <input type="text" id="qf-person" placeholder="例）山田" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ② 引き合い条件（作業範囲・輸送ルート） -->
+<div class="condition-section" id="section-cond" draggable="true">
+  <h2 onclick="toggleCondBody()">
+    <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+    🚢 引き合い条件
+    <span class="toggle-icon" id="condToggleIcon">▼</span>
+  </h2>
+  <div id="condBody">
+    <p class="section-desc"><b>輸出/輸入</b>と<b>輸送モード（Sea/Air）</b>を選択してください。<b>インコタームズ</b>を選択すると下のマイルストーンに売主／買主の費用負担区分がカラーで表示されます。<b>倉庫作業・保険付保</b>が必要な場合はオプションボタンをONにしてください。</p>
+
+    <!-- ===== 最上位セレクター：方向 & 輸送モード ===== -->
+    <div class="cond-primary-bar">
+
+      <!-- 方向 -->
+      <div class="cond-prim-group">
+        <span class="cond-prim-label">方向</span>
+        <div class="cond-prim-btns" id="dirBtns">
+          <button class="cond-prim-btn" data-dir="export" onclick="setDirection('export')">📤 輸出</button>
+          <button class="cond-prim-btn" data-dir="import" onclick="setDirection('import')">📥 輸入</button>
+        </div>
+      </div>
+
+      <!-- 輸送モード -->
+      <div class="cond-prim-group">
+        <span class="cond-prim-label">輸送モード</span>
+        <div class="cond-prim-btns" id="seaAirBtns">
+          <button class="cond-prim-btn" data-transport="sea" onclick="setTransport('sea')">🚢 Sea</button>
+          <button class="cond-prim-btn" data-transport="air" onclick="setTransport('air')">✈️ Air</button>
+        </div>
+        <!-- FCL / LCL（Seaのとき表示） -->
+        <div class="cond-sub-btns" id="fclLclBtns" style="display:none;">
+          <button class="cond-sub-btn active" data-sub="fcl" onclick="setSeaSub('fcl')">FCL</button>
+          <button class="cond-sub-btn"        data-sub="lcl" onclick="setSeaSub('lcl')">LCL</button>
+        </div>
+        <!-- 内部的に保持（既存JS が参照） -->
+        <select id="cond-mode" style="display:none" onchange="updateRouteModeIcon()">
+          <option value="">— 選択 —</option>
+          <option>海上（FCL）</option>
+          <option>海上（LCL）</option>
+          <option>航空（AIR）</option>
+          <option>海上＋陸上</option>
+          <option>航空＋陸上</option>
+          <option>陸上のみ</option>
+        </select>
+        <span id="mode-container-hint" style="display:none;font-size:10px;color:#e67e22;margin-top:4px;">
+          📦 LCL/AIR → コンテナ欄を非表示
+        </span>
+      </div>
+
+      <!-- オプション -->
+      <div class="cond-prim-group">
+        <span class="cond-prim-label">オプション</span>
+        <div class="cond-prim-btns">
+          <button class="wh-toggle-btn" id="whToggleBtn" onclick="toggleWarehouse()">🏬 倉庫作業あり</button>
+          <button class="wh-toggle-btn" id="insToggleBtn" onclick="toggleInsurance()" style="border-color:#2471a3;color:#2471a3;">🛡️ 保険付保あり</button>
+        </div>
+        <span class="wh-toggle-desc" id="whToggleDesc"></span>
+      </div>
+
+      <!-- スコープ拡張 -->
+      <div class="cond-prim-group">
+        <span class="cond-prim-label">スコープ拡張</span>
+        <div class="cond-prim-btns">
+          <button class="wh-toggle-btn" id="optPickupBtn"
+                  onclick="toggleScopeOpt('pickup')"
+                  title="輸入EXW等：売り手の倉庫・工場からの集荷も手配する">
+            🚚 集荷から手配
+          </button>
+          <button class="wh-toggle-btn" id="optDeliverBtn"
+                  onclick="toggleScopeOpt('deliver')"
+                  title="輸出EXW等：買い手の最終納入地まで手配する">
+            🏠 納入まで手配
+          </button>
+          <button class="wh-toggle-btn" id="optPackingBtn"
+                  onclick="toggleScopeOpt('packing')"
+                  title="梱包・木箱などの梱包作業を弊社で手配する">
+            📦 梱包手配あり
+          </button>
+          <button class="wh-toggle-btn" id="optCustomsEBtn"
+                  onclick="toggleScopeOpt('customsE')"
+                  title="輸出通関を手配する（FOB以上で通常必要）">
+            🛃 輸出通関
+          </button>
+          <button class="wh-toggle-btn" id="optCustomsIBtn"
+                  onclick="toggleScopeOpt('customsI')"
+                  title="輸入通関を手配する（DDPなど売り手が手配する場合も）">
+            🛃 輸入通関
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- インコタームズ -->
+    <div class="cond-inco-bar">
+      <label class="cond-inco-label">🔖 インコタームズ</label>
+      <select id="cond-incoterms" onchange="onIncotermsChange()">
+        <option value="">— 選択 —</option>
+        <optgroup label="任意の場所">
+          <option>EXW（工場渡し）</option>
+          <option>FCA（運送人渡し）</option>
+          <option>CPT（輸送費込み）</option>
+          <option>CIP（輸送費・保険料込み）</option>
+          <option>DAP（仕向地持込渡し）</option>
+          <option>DPU（荷卸込持込渡し）</option>
+          <option>DDP（関税込持込渡し）</option>
+        </optgroup>
+        <optgroup label="海上・内水路専用" id="inco-sea-group">
+          <option>FAS（船側渡し）</option>
+          <option>FOB（本船渡し）</option>
+          <option>CFR（運賃込み）</option>
+          <option>CIF（運賃・保険料込み）</option>
+        </optgroup>
+      </select>
+      <span id="inco-dest-hint" style="display:none;font-size:10px;color:#e67e22;">
+        📍 PORT渡し → 納入地フィールドを非表示
+      </span>
+    </div>
+
+    <!-- ===== 輸送ルート マイルストーン ===== -->
+    <div class="route-milestone-wrap">
+      <div class="route-milestone-header">
+        <div class="cond-section-label">🗺️ 輸送ルート</div>
+        <button class="route-layout-toggle active" id="routeLayoutToggle" onclick="toggleRouteLayout()">↔ 横表示</button>
+      </div>
+      <!-- インコタームズ責任ゾーン情報 -->
+      <div class="incoterms-info-bar" id="incotermInfoBar">
+        <span class="inc-badge" id="incBadge"></span>
+        <span id="incZoneText"></span>
+        <span class="inc-sep">|</span>
+        <span class="inc-legend">
+          <span class="inc-legend-item seller">売り手</span>
+          <span class="inc-legend-item transfer">リスク移転</span>
+          <span class="inc-legend-item buyer">買い手</span>
+        </span>
+        <span id="incInsuranceLegend" style="display:none;" class="inc-legend">
+          <span class="inc-legend-item insured">保険区間</span>
+        </span>
+      </div>
+      <!-- 保険区間情報 -->
+      <div class="insurance-info-bar" id="insuranceInfoBar">
+        <span class="ins-label">🛡️ 保険付保</span>
+        <span class="ins-range" id="insuranceRangeText">区間：—</span>
+      </div>
+      <div class="route-milestone vertical" id="routeMilestone">
+
+        <!-- ① 集荷地（起点） -->
+        <div class="route-node rn-zone-origin" id="rn-origin" data-scope-key="origin">
+          <div class="route-node-badge">🏭</div>
+          <div class="route-node-name">集荷地</div>
+          <div class="route-node-sub">Pickup</div>
+          <input type="text" id="cond-origin"         class="route-input" placeholder="例）品川区" />
+          <input type="text" id="cond-origin-country" class="route-input route-input-country" placeholder="🌏 国名（例: 日本）" />
+        </div>
+
+        <!-- コネクター：集荷地 → 梱包（梱包手配ありのとき表示） -->
+        <div class="route-connector opt-hidden" id="conn-origin-packing">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-origin-packing" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- 梱包ノード（梱包手配ありのとき表示） -->
+        <div class="route-node opt-hidden rn-zone-origin" id="rn-packing">
+          <button class="node-hide-btn" onclick="hideNode('rn-packing')" title="梱包ノードを非表示">✕</button>
+          <div class="route-node-badge rn-badge-pack">📦</div>
+          <div class="route-node-name">梱包作業</div>
+          <div class="route-node-sub">Packing / Crating</div>
+          <input type="text" id="cond-packing-place" class="route-input" placeholder="場所（例）大田区の倉庫" />
+          <select class="route-input-wh-type" id="cond-packing-type">
+            <option value="">— 梱包種別 —</option>
+            <option>木製梱包（木箱）</option>
+            <option>カートン梱包</option>
+            <option>スチールケース</option>
+            <option>フレコンバッグ</option>
+            <option>パレット積み</option>
+            <option>その他</option>
+          </select>
+        </div>
+
+        <!-- コネクター：梱包 → 積み地（梱包手配ありのとき表示） -->
+        <div class="route-connector opt-hidden" id="conn-packing-pol">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-packing-pol" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- コネクター：国内直行（domestic / warehouse 専用） -->
+        <div class="route-connector scope-hidden" id="conn-direct">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-direct" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- コネクター：集荷地 → 積み地（または倉庫） -->
+        <div class="route-connector" id="conn-origin-pol">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-origin-pol" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- ② 倉庫（出発地側） ─ 倉庫スコープのみ表示 -->
+        <div class="route-node scope-hidden rn-zone-origin" id="rn-wh-origin">
+          <button class="node-hide-btn" onclick="hideNode('rn-wh-origin')" title="倉庫（出発）ノードを非表示">✕</button>
+          <div class="route-node-badge rn-badge-wh">🏬</div>
+          <div class="route-node-name">倉庫作業</div>
+          <div class="route-node-sub">Origin WH</div>
+          <input type="text"   id="cond-wh-origin"      class="route-input" placeholder="倉庫名・場所" />
+          <select             id="cond-wh-origin-type"  class="route-input-wh-type">
+            <option value="">— 作業種別 —</option>
+            <option>保管</option>
+            <option>バン詰め（Stuffing）</option>
+            <option>仕分・検品</option>
+            <option>ラベル貼付</option>
+            <option>梱包・再梱包</option>
+            <option>その他</option>
+          </select>
+        </div>
+
+        <!-- コネクター：倉庫 → 積み地 -->
+        <div class="route-connector scope-hidden" id="conn-wh-origin-pol">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-wh-origin-pol" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- コネクター：倉庫 → 納入地（warehouse domestic 用） -->
+        <div class="route-connector scope-hidden" id="conn-wh-dest">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-wh-dest" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- 輸出通関ノード（🛃 輸出通関ボタンで表示） -->
+        <div class="route-node opt-hidden rn-zone-origin" id="rn-customs-e">
+          <button class="node-hide-btn" onclick="hideNode('rn-customs-e')" title="輸出通関ノードを非表示">✕</button>
+          <div class="route-node-badge rn-badge-customs">🛃</div>
+          <div class="route-node-name">輸出通関</div>
+          <div class="route-node-sub">Export Customs</div>
+          <input type="text" id="cond-customs-e-broker" class="route-input" placeholder="通関業者（例）〇〇通関" />
+        </div>
+
+        <!-- コネクター：輸出通関 → 積み地 -->
+        <div class="route-connector opt-hidden" id="conn-customs-e-pol">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-customs-e-pol" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- ③ 積み地 POL -->
+        <div class="route-node rn-zone-origin" id="rn-pol" data-scope-key="pol">
+          <div class="route-node-badge rn-badge-port">📦</div>
+          <div class="route-node-name">積み地</div>
+          <div class="route-node-sub">POL</div>
+          <input type="text" id="cond-pol" class="route-input" placeholder="例）Yokohama CY" />
+        </div>
+
+        <!-- コネクター：POL → POD（海上 / 航空メイン区間） -->
+        <div class="route-connector route-conn-main" id="conn-pol-pod">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon" id="route-mode-icon">🚢</div>
+          <input type="text" id="carr-pol-pod" class="route-conn-carrier" placeholder="船会社・航空会社" />
+        </div>
+
+        <!-- ④ 揚げ地 POD -->
+        <div class="route-node rn-zone-dest" id="rn-pod" data-scope-key="pod">
+          <div class="route-node-badge rn-badge-port">🏁</div>
+          <div class="route-node-name">揚げ地</div>
+          <div class="route-node-sub">POD</div>
+          <input type="text" id="cond-pod" class="route-input" placeholder="例）Shanghai CY" />
+        </div>
+
+        <!-- コネクター：揚げ地 → 輸入通関（🛃 輸入通関ボタンで表示） -->
+        <div class="route-connector opt-hidden" id="conn-pod-customs-i">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-pod-customs-i" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- 輸入通関ノード -->
+        <div class="route-node opt-hidden rn-zone-dest" id="rn-customs-i">
+          <button class="node-hide-btn" onclick="hideNode('rn-customs-i')" title="輸入通関ノードを非表示">✕</button>
+          <div class="route-node-badge rn-badge-customs">🛃</div>
+          <div class="route-node-name">輸入通関</div>
+          <div class="route-node-sub">Import Customs</div>
+          <input type="text" id="cond-customs-i-broker" class="route-input" placeholder="通関業者（例）〇〇通関" />
+        </div>
+
+        <!-- コネクター：揚げ地 → 倉庫（到着地側） -->
+        <div class="route-connector scope-hidden" id="conn-pod-wh-dest">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-pod-wh" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- ⑤ 倉庫（到着地側） ─ 倉庫スコープ＋輸入 / D2D などで表示 -->
+        <div class="route-node scope-hidden rn-zone-dest" id="rn-wh-dest">
+          <button class="node-hide-btn" onclick="hideNode('rn-wh-dest')" title="倉庫（到着）ノードを非表示">✕</button>
+          <div class="route-node-badge rn-badge-wh">🏬</div>
+          <div class="route-node-name">倉庫作業</div>
+          <div class="route-node-sub">Dest WH</div>
+          <input type="text"  id="cond-wh-dest"      class="route-input" placeholder="倉庫名・場所" />
+          <select            id="cond-wh-dest-type"  class="route-input-wh-type">
+            <option value="">— 作業種別 —</option>
+            <option>保管</option>
+            <option>デバン（Devanning）</option>
+            <option>仕分・検品</option>
+            <option>ラベル貼付</option>
+            <option>梱包・再梱包</option>
+            <option>その他</option>
+          </select>
+        </div>
+
+        <!-- コネクター：倉庫（到着） → 納入地 -->
+        <div class="route-connector scope-hidden" id="conn-wh-dest-dest">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-wh-dest-dest" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- コネクター：揚げ地 → 納入地（直接） -->
+        <div class="route-connector" id="conn-pod-dest">
+          <div class="route-conn-track"></div>
+          <div class="route-conn-icon">🚛</div>
+          <input type="text" id="carr-pod-dest" class="route-conn-carrier" placeholder="運送会社" />
+        </div>
+
+        <!-- ⑥ 納入地（終点） -->
+        <div class="route-node rn-zone-dest" id="rn-dest" data-scope-key="dest">
+          <div class="route-node-badge rn-badge-dest">📬</div>
+          <div class="route-node-name">納入地</div>
+          <div class="route-node-sub">Delivery</div>
+          <input type="text" id="cond-dest"         class="route-input" placeholder="例）上海市浦東新区" />
+          <input type="text" id="cond-dest-country" class="route-input route-input-country" placeholder="🌏 国名（例: 中国）" />
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ③ 貨物情報 ＋ サイズ計算（統合） -->
+<div class="condition-section" id="section-cargo" draggable="true">
+  <h2 onclick="toggleSection('cargoBody','cargoToggle')">
+    <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+    📦 貨物情報・サイズ計算
+    <span class="toggle-icon" id="cargoToggle">▼</span>
+  </h2>
+  <div id="cargoBody">
+    <p class="section-desc">貨物の基本情報を入力し、寸法から CBM・チャージャブルウェイトを自動計算できます。<b>計算結果</b>は下の見積もり表の数量欄へそのまま転記できます。</p>
+
+    <!-- ─── 基本情報グリッド ─── -->
+    <div class="condition-grid">
+      <div class="cond-field">
+        <label><span class="cond-icon">🏷️</span> 貨物名</label>
+        <input type="text" id="cond-cargo" placeholder="例）自動車部品" />
+      </div>
+      <div class="cond-field" data-scope-key="container">
+        <label><span class="cond-icon">📐</span> コンテナ・スペース</label>
+        <select id="cond-container">
+          <option value="">— 選択 —</option>
+          <option>20'GP × 1</option>
+          <option>40'GP × 1</option>
+          <option>40'HQ × 1</option>
+          <option>20'GP × 2</option>
+          <option>40'GP × 2</option>
+          <option>40'HQ × 2</option>
+          <option>20'RF（冷凍）</option>
+          <option>40'RF（冷凍）</option>
+          <option>LCL（混載）</option>
+          <option>未定</option>
+        </select>
+      </div>
+      <div class="cond-field">
+        <label><span class="cond-icon">⚖️</span> 重量（概算）</label>
+        <input type="text" id="cond-weight" placeholder="例）5,000 kg" />
+      </div>
+      <div class="cond-field">
+        <label><span class="cond-icon">📏</span> 容積（概算）</label>
+        <input type="text" id="cond-volume" placeholder="例）20 CBM" />
+      </div>
+      <div class="cond-field">
+        <label><span class="cond-icon">📦</span> 荷姿</label>
+        <input type="text" id="cond-packing" placeholder="例）カートン / パレット" />
+      </div>
+      <div class="cond-field">
+        <label><span class="cond-icon">☣️</span> 危険品・特殊貨物</label>
+        <select id="cond-hazmat">
+          <option value="">— 選択 —</option>
+          <option>なし（一般貨物）</option>
+          <option>危険品あり（クラス要確認）</option>
+          <option>温度管理品（冷蔵）</option>
+          <option>温度管理品（冷凍）</option>
+          <option>重量物・大型貨物</option>
+          <option>その他（特記事項参照）</option>
+        </select>
+      </div>
+    </div>
+    <div class="cond-actions">
+      <button class="btn-cond-clear" onclick="clearConditions()">クリア</button>
+    </div>
+
+    <!-- ─── 区切り ─── -->
+    <div style="margin: 18px 0 14px; border-top: 1px dashed #d0dce8; padding-top: 14px;">
+      <div style="font-size:12px; font-weight:700; color:#2980b9; margin-bottom:10px; letter-spacing:.04em;">
+        📐 寸法・重量の詳細入力（CBM / CW 自動計算）
+      </div>
+      <div class="calc-wrapper">
+        <table class="calc-mini-table" id="calcTable">
+          <thead>
+            <tr>
+              <th>個数</th>
+              <th>長さ(cm)</th>
+              <th>幅(cm)</th>
+              <th>高さ(cm)</th>
+              <th>CBM小計</th>
+              <th>粗重量(kg)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="calcBody"></tbody>
+        </table>
+        <button class="btn-calc-add" onclick="addCalcRow()">＋ 荷物の種類を追加</button>
+        <button class="btn-calc-run" onclick="runCalc()">📐 計算する</button>
+        <div class="calc-results-panel" id="calcResultsPanel">
+          <div class="calc-results-grid" id="calcResultsGrid"></div>
+          <hr class="calc-divider-line">
+          <div class="calc-reflect-title">📋 見積もり行に数量を反映</div>
+          <div id="calcReflectRows"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ⑤ 見積もりテーブル -->
+<div class="condition-section" id="section-table" draggable="true">
+  <h2 onclick="toggleSection('tableWrap','tableToggle')">
+    <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+    📋 見積もりテーブル
+    <span class="toggle-icon" id="tableToggle">▼</span>
+  </h2>
+  <div id="tableWrap">
+    <p class="section-desc">費用項目ごとに <b>支払い（仕入）</b> と <b>請求</b> の数量・通貨・単価を入力します。<b>③ 乗せ幅</b> を入力すると請求単価に自動加算、<b>④ 利益</b> 欄で粗利をリアルタイム確認できます。CSV インポートやカテゴリ順並び替えも利用可能です。</p>
+    <div class="container">
+      <table id="quoteTable">
+        <thead>
+          <tr>
+            <th rowspan="2" class="hd-base" style="width:28px;"></th>
+            <th rowspan="2" class="hd-base" style="width:105px;">カテゴリ</th>
+            <th rowspan="2" class="hd-base" style="width:44px;">課税</th>
+            <th rowspan="2" class="hd-base">項目名</th>
+            <th colspan="4" class="hd-pay">支払い</th>
+            <th colspan="3" class="hd-bill">請求</th>
+            <th colspan="3" class="hd-profit">利益計算</th>
+            <th rowspan="2" class="hd-base"></th>
+          </tr>
+          <tr>
+            <th class="hd-pay">数量</th>
+            <th class="hd-pay">通貨</th>
+            <th class="hd-pay">単価</th>
+            <th class="hd-pay" style="color:#ccc;">① CD</th>
+            <th class="hd-bill" style="color:#bde8c8;">② 数量</th>
+            <th class="hd-bill" style="color:#bde8c8;">② 通貨</th>
+            <th class="hd-bill" style="color:#bde8c8;">② 単価</th>
+            <th class="hd-profit">③ 乗せ幅</th>
+            <th class="hd-profit">④ 利益</th>
+            <th class="hd-profit">備考</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        <tfoot>
+          <tr>
+            <td></td><td></td>
+            <td colspan="4" style="text-align:right; color:#555;">合　計</td>
+            <td>—</td>
+            <td style="background:#f0f0f0; color:#aaa; text-align:center;">—</td>
+            <td colspan="2">—</td>
+            <td id="tot-billing" style="text-align:right; padding-right:10px; min-width:85px;">—</td>
+            <td id="tot-markup"  style="text-align:right; padding-right:10px; min-width:85px;">—</td>
+            <td class="profit-cell profit-zero" id="tot-profit">—</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+      <button class="btn-add"        onclick="addRow()">＋ 行を追加</button>
+      <button class="btn-sort-cat"   onclick="sortByCategory()">🔀 カテゴリー順に並べ替え</button>
+      <button class="btn-preview"    onclick="openPreview()">📋 プレビュー</button>
+      <button class="btn-csv-import" onclick="toggleCsvZone()">📂 CSV読み込み</button>
+      <button class="btn-reset"      onclick="resetAll()">リセット</button>
+      <div id="csvDropZone" onclick="document.getElementById('csvFileInput').click()"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        📂 クリックしてCSVを選択、またはここにドラッグ＆ドロップ
+        <p>※ 1行目にヘッダー行がある場合は自動で読み飛ばします</p>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="loadCSV(event)" />
+      </div>
+      <div id="csvMsg"></div>
+      <p class="tip">
+        <b class="blue">⠿</b>：行をドラッグして並び替え　／
+        <b>＋</b>：その行の直下に行を挿入　／
+        <b class="red">課税</b>：チェックで * を項目名先頭に追記<br>
+        <b class="gray">CD・②列</b>：表示専用（編集・Tab 不可）　／
+        ③ 乗せ幅 → ②単価へ加算　／　④ 利益 ＝ 請求合計 － 支払い合計<br>
+        <b class="purple">↑↓キー</b>：同じ列で行間移動
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ⑥ 特記事項 -->
+<div class="condition-section" id="section-free" draggable="true">
+  <h2 onclick="toggleSection('freeBody','freeToggle')">
+    <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+    📝 特記事項・補足（自由入力）
+    <span class="toggle-icon" id="freeToggle">▼</span>
+  </h2>
+  <div id="freeBody">
+    <p class="section-desc">荷主からの特別な要望や制約事項を自由に記入します。指定船会社・B/L 条件・バン詰め場所・その他の注意点など、<b>見積もりには含まれないが把握しておくべき情報</b>を残す欄として活用してください。</p>
+    <div class="cond-free">
+      <textarea id="condFreeText" placeholder="例）&#10;・荷主の工場でのバン詰め（FC Stuff）希望&#10;・特定船会社指定あり（ONE / MSC）&#10;・B/L条件：Shipper's Order B/L希望&#10;・その他ご要望・注意事項をご記入ください"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ⑦ 全体リマーク -->
+<div class="condition-section remark-section" id="section-remark" draggable="true">
+  <h2 onclick="toggleRemarkBody()">
+    <span class="drag-handle" title="ドラッグして並び替え">⠿</span>
+    📝 全体リマーク（条件・免責事項）
+    <span class="toggle-icon" id="remarkToggleIcon">▼</span>
+  </h2>
+  <div id="remarkBody" class="remark-body">
+    <p class="section-desc">見積もり全体に共通して適用する条件・免責事項を入力します。<b>プリセットボタン</b>（有効期限・運賃変動条項・フリータイムなど）をクリックすると定型文を追加できます。提出前に必ず内容を確認してください。</p>
+    <div class="remark-presets" id="presetBtns"></div>
+    <textarea id="remarkTextarea" placeholder="見積もり全体に適用する条件・免責事項を入力してください。上のボタンでプリセットを追加できます。"></textarea>
+    <div class="remark-actions">
+      <button class="btn-remark-clear" onclick="clearRemark()">クリア</button>
+      <span class="remark-char" id="remarkChar">0文字</span>
+    </div>
+  </div>
+</div>
+
+<!-- プレビューモーダル -->
+<!-- ========== スコーププリセットダイアログ ========== -->
+<div class="scope-preset-modal" id="scopePresetModal">
+  <div class="scope-preset-box">
+    <div class="scope-preset-title" id="scopePresetTitle">📋 プリセットを挿入しますか？</div>
+    <div class="scope-preset-desc" id="scopePresetDesc">
+      この作業範囲に対応した標準見積項目を挿入できます。<br>
+      挿入後に内容を自由に編集できます。
+    </div>
+    <div class="scope-preset-items" id="scopePresetItems"></div>
+    <div class="scope-preset-btns">
+      <button class="scope-preset-btn scope-preset-btn-replace"
+              onclick="applyScopePreset('replace')">🔄 置換（現在の行を全て入れ替え）</button>
+      <button class="scope-preset-btn scope-preset-btn-append"
+              onclick="applyScopePreset('append')">➕ 追加（末尾に追記）</button>
+      <button class="scope-preset-btn scope-preset-btn-skip"
+              onclick="closeScopePresetDlg()">スキップ</button>
+    </div>
+  </div>
+</div>
+
+<div id="previewOverlay" onclick="overlayClick(event)">
+  <div id="previewBox">
+    <h2>📋 プレビュー（表計算形式）</h2>
+    <div id="pvMeta" class="pv-meta" style="display:none;"></div>
+    <div id="pvCondBox" style="display:none;"><strong>🚢 引き合い条件</strong></div>
+    <div id="previewTableWrap"></div>
+    <div id="pvRemarkBox" style="display:none;"><strong>📝 条件・リマーク</strong></div>
+    <div class="pv-btns">
+      <button class="pv-btn-copy" onclick="copyTSV()">📑 クリップボードにコピー（Excel 貼り付け用）</button>
+      <button class="pv-btn-csv"  onclick="downloadCSV()">⬇ CSV ダウンロード</button>
+      <button class="pv-btn-close" onclick="closePreview()">閉じる</button>
+      <span class="pv-copy-msg" id="copyMsg">✅ コピーしました！</span>
+    </div>
+    <p class="pv-hint">
+      ※ CSV はデータ行のみ出力（カテゴリ列を先頭に付与）。再読み込みにも対応。<br>
+      ※ 課税項目は項目名の先頭に * が付いています。
+    </p>
+  </div>
+</div>
+
+<script>
+  // ========== 定数 ==========
+  const CURRENCIES = ['JPY','USD','EUR','CNY','KRW','SGD','HKD','GBP','AUD','TWD','THB','VND','MYR','IDR'];
+
+  const CATEGORIES = [
+    { value: '',          label: '— カテゴリ —',    cls: '' },
+    { value: 'domestic',  label: '🏠 国内作業',      cls: 'cat-domestic'  },
+    { value: 'ocean',     label: '🚢 海上運賃',      cls: 'cat-ocean'     },
+    { value: 'air',       label: '✈️ 航空運賃',     cls: 'cat-air'       },
+    { value: 'overseas',  label: '🌏 海外作業',      cls: 'cat-overseas'  },
+    { value: 'surcharge', label: '⚡ サーチャージ',   cls: 'cat-surcharge' },
+    { value: 'customs',   label: '🛃 通関費',        cls: 'cat-customs'   },
+    { value: 'insurance', label: '🛡️ 保険料',       cls: 'cat-insurance' },
+    { value: 'other',     label: '📋 その他',        cls: 'cat-other'     },
+  ];
+  const CAT_VALUES = CATEGORIES.map(c => c.value);
+
+  // ---- 各スコープに対応する見積プリセット行 ----
+  // cat: CATEGORIES の value と一致させること
+  const SCOPE_PRESETS = {
+    domestic: [
+      { cat: 'domestic',  name: '国内集荷・陸送費',  note: '集荷先〜倉庫/港' },
+      { cat: 'domestic',  name: '荷役・仕分け費',    note: '積み下ろし・仕分け作業' },
+      { cat: 'domestic',  name: '国内配送費',        note: '倉庫/港〜納入地' },
+      { cat: 'other',     name: 'その他国内費用',    note: '' },
+    ],
+    export: [
+      { cat: 'domestic',  name: '国内集荷・陸送費',  note: '集荷先〜輸出港' },
+      { cat: 'customs',   name: '輸出通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '港湾諸費用（輸出）', note: 'THC・ドキュメント費等' },
+      { cat: 'ocean',     name: '海上運賃',          note: 'ポート〜ポート' },
+      { cat: 'surcharge', name: 'サーチャージ類',    note: 'BAF/CAF/PSS 等' },
+      { cat: 'overseas',  name: '仕向地費用',        note: 'D/O・目的港荷役等' },
+    ],
+    import: [
+      { cat: 'ocean',     name: '海上運賃',          note: '積み地港〜仕向港' },
+      { cat: 'surcharge', name: 'サーチャージ類',    note: 'BAF/CAF/PSS 等' },
+      { cat: 'overseas',  name: '仕向港費用',        note: 'THC・D/O 等' },
+      { cat: 'customs',   name: '輸入通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '国内配送費',        note: '港〜納入地' },
+      { cat: 'insurance', name: '海上保険料',        note: '保険条件に応じて' },
+    ],
+    dtd: [
+      { cat: 'domestic',  name: '国内集荷・陸送費',  note: '集荷先〜輸出港' },
+      { cat: 'customs',   name: '輸出通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '港湾諸費用（輸出）', note: 'THC・ドキュメント費等' },
+      { cat: 'ocean',     name: '海上運賃',          note: 'ポート〜ポート' },
+      { cat: 'surcharge', name: 'サーチャージ類',    note: 'BAF/CAF/PSS 等' },
+      { cat: 'overseas',  name: '仕向地費用',        note: 'D/O・目的港荷役等' },
+      { cat: 'customs',   name: '輸入通関費',        note: '通関手数料・書類作成' },
+      { cat: 'domestic',  name: '国内配送費（着地）', note: '港〜最終納入地' },
+    ],
+  };
+
+  // ---- ダイアログが参照するスコープを保持する変数 ----
+  let _presetPendingScope = '';
+
+  // ---- インコタームズ 3文字コード → 作業範囲 マッピング ----
+  // 輸入スコープはインコタームズだけでは判断できないため手動選択
+  const INCO_TO_SCOPE = {
+    EXW: 'domestic',                              // 工場渡し → 国内集荷のみ
+    FCA: 'export', FAS: 'export', FOB: 'export', // 輸出港渡し → 輸出
+    CFR: 'export', CIF: 'export',                 // 運賃/保険込み → 輸出
+    CPT: 'export', CIP: 'export',                 // 輸送費/保険込み → 輸出
+    DAP: 'dtd',    DPU: 'dtd',                   // 仕向地渡し → Door to Door
+    DDP: 'dtd',    DAT: 'dtd',                   // 関税込み渡し → Door to Door
+  };
+
+  // ---- インコタームズ別マイルストーンプリセット ----
+  // pickup: 集荷から手配, deliver: 納入まで手配, warehouse: 倉庫作業あり
+  // customsE: 輸出通関, customsI: 輸入通関  (packing は手動オプションのため含まない)
+  const INCO_MILESTONE_PRESETS = {
+    //       ┌─── 輸出方向（FF が輸出側を担当） ────────────────────────────────────┐
+    //       │ pickup  deliver  warehouse  customsE  customsI
+    //       └──────────────────────────────────────────────────────────────────────┘
+    'EXW': {
+      export: { pickup:false, deliver:false, warehouse:false, customsE:false, customsI:false },
+      // 輸入EXW: 売り手の工場から全て手配。集荷・輸入通関・納入まで
+      import: { pickup:true,  deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'FCA': {
+      // 輸出FCA: 指定地（運送人）まで。輸出通関は売り手責任だが FF が手配することも
+      export: { pickup:false, deliver:false, warehouse:false, customsE:false, customsI:false },
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'FAS': {
+      // 輸出FAS: 船側渡し。輸出通関は買い手責任（珍しいが規定上）
+      export: { pickup:false, deliver:false, warehouse:false, customsE:false, customsI:false },
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'FOB': {
+      // 輸出FOB: 本船積み込み。輸出通関は売り手（FF）責任
+      export: { pickup:false, deliver:false, warehouse:false, customsE:true,  customsI:false },
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'CFR': {
+      // 輸出CFR: 運賃込み（目的港まで運賃負担）。輸出通関は売り手
+      export: { pickup:false, deliver:false, warehouse:false, customsE:true,  customsI:false },
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'CIF': {
+      // 輸出CIF: 運賃・保険料込み。輸出通関は売り手
+      export: { pickup:false, deliver:false, warehouse:false, customsE:true,  customsI:false },
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'CPT': {
+      // 輸出CPT: 指定地まで輸送費負担。輸出通関は売り手、納入地まで手配
+      export: { pickup:false, deliver:true,  warehouse:false, customsE:true,  customsI:false },
+      // 輸入CPT: 売り手が指定地まで運賃負担。FF は輸入通関のみ担当することが多い
+      import: { pickup:false, deliver:false, warehouse:false, customsE:false, customsI:true  },
+    },
+    'CIP': {
+      // 輸出CIP: CPT + 輸送保険。輸出通関は売り手、納入地まで手配
+      export: { pickup:false, deliver:true,  warehouse:false, customsE:true,  customsI:false },
+      import: { pickup:false, deliver:false, warehouse:false, customsE:false, customsI:true  },
+    },
+    'DAP': {
+      // 輸出DAP: 仕向地持込渡し（荷卸し除く）。輸出通関は売り手、納入地まで
+      export: { pickup:false, deliver:true,  warehouse:false, customsE:true,  customsI:false },
+      // 輸入DAP: 輸入通関は買い手責任。FF が通関を担当
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:true  },
+    },
+    'DPU': {
+      // 輸出DPU: 荷卸込持込渡し。売り手がデバン（荷卸し）まで負担
+      export: { pickup:false, deliver:true,  warehouse:true,  customsE:true,  customsI:false },
+      // 輸入DPU: 売り手が荷卸しまで負担。輸入通関も売り手責任（DDPと異なりDutyは買い手）
+      import: { pickup:false, deliver:true,  warehouse:true,  customsE:false, customsI:false },
+    },
+    'DDP': {
+      // 輸出DDP: 関税込持込渡し。輸出通関・輸入通関・納入まで全て売り手負担
+      export: { pickup:false, deliver:true,  warehouse:false, customsE:true,  customsI:true  },
+      // 輸入DDP: 全て売り手が手配。FF としてはほぼ作業なし（または売り手代理で全て）
+      import: { pickup:false, deliver:true,  warehouse:false, customsE:false, customsI:false },
+    },
+  };
+
+  // ========== 作業範囲スコープ ==========
+  const SCOPE_CONFIG = {
+    all: {
+      hide: [],
+      warehouse: false,
+      hint: '作業範囲を選ぶと、不要な入力欄が自動で非表示になります。'
+    },
+    domestic: {
+      hide: ['pol', 'pod', 'container'],
+      warehouse: false,
+      hint: '🏠 国内のみ ─ 国内集荷 → 国内納入先。POL / POD・コンテナ欄は非表示です。'
+    },
+    export: {
+      hide: ['dest'],
+      warehouse: false,
+      hint: '📤 輸出 ─ 国内集荷 → 積み港 → 揚げ港（または海外渡し）。納入地欄は非表示です。'
+    },
+    import: {
+      hide: ['origin'],
+      warehouse: false,
+      hint: '📥 輸入 ─ 積み港 → 揚げ港 → 国内納入先。集荷地欄は非表示です。'
+    },
+    dtd: {
+      hide: [],
+      warehouse: false,
+      hint: '🌐 Door to Door ─ 国内集荷 → 海外最終納入先まで全行程。すべての欄が有効です。'
+    },
+  };
+
+  let warehouseOn = false;
+
+  function setScope(scope) {
+    // ボタンのアクティブ状態を更新
+    document.querySelectorAll('.scope-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.scope === scope)
+    );
+    // ヒントを更新
+    const hint = document.getElementById('scopeHint');
+    if (hint) hint.textContent = SCOPE_CONFIG[scope]?.hint ?? '';
+    // フィールドの表示 / 非表示（ノード含む）
+    const hideKeys = new Set(SCOPE_CONFIG[scope]?.hide ?? []);
+    document.querySelectorAll('[data-scope-key]').forEach(el => {
+      el.classList.toggle('scope-hidden', hideKeys.has(el.dataset.scopeKey));
+    });
+    // セクションラベル（data-section-fields 属性付き）の自動表示 / 非表示
+    document.querySelectorAll('[data-section-fields]').forEach(label => {
+      const fields = label.dataset.sectionFields.split(',');
+      const anyVisible = fields.some(k => {
+        const el = document.querySelector(`[data-scope-key="${k}"]`);
+        return el && !el.classList.contains('scope-hidden');
+      });
+      label.classList.toggle('scope-hidden', !anyVisible);
+      const prev = label.previousElementSibling;
+      if (prev && prev.tagName === 'HR') prev.classList.toggle('scope-hidden', !anyVisible);
+    });
+    // ルートコネクターの表示を更新
+    updateRouteConnectors(scope);
+
+  }
+
+  // ===== 倉庫オプショントグル =====
+  function toggleWarehouse() {
+    warehouseOn = !warehouseOn;
+    const btn  = document.getElementById('whToggleBtn');
+    const desc = document.getElementById('whToggleDesc');
+    btn?.classList.toggle('active', warehouseOn);
+    if (desc) desc.textContent = warehouseOn ? '倉庫ノードをルートに追加中' : '';
+    // _currentDirection から scope を取得（scope-btn廃止のため）
+    const scope = { export: 'export', import: 'import' }[_currentDirection] || 'all';
+    updateRouteConnectors(scope);
+  }
+
+  // ===== ルートコネクター制御 =====
+  function updateRouteConnectors(scope) {
+    const cfg    = SCOPE_CONFIG[scope] ?? SCOPE_CONFIG['all'];
+    const hidden = new Set(cfg.hide ?? []);
+    const wh     = warehouseOn;
+
+    const sO = !hidden.has('origin');  // 集荷地が見えるか
+    const sL = !hidden.has('pol');     // POL が見えるか
+    const sD = !hidden.has('pod');     // POD が見えるか
+    const sT = !hidden.has('dest');    // 納入地が見えるか
+
+    // ─── 到着地側倉庫：POD が見えて dest も見えるときだけ表示 ───
+    const showWhDest = wh && sD && sT;
+
+    if (wh) {
+      // ── 倉庫ON ──
+
+      // 出発側倉庫ノード：origin が見えるときだけ
+      _sc('rn-wh-origin',     !sO);
+      // 到着側倉庫ノード
+      _sc('rn-wh-dest',       !showWhDest);
+
+      // origin → 倉庫（conn-direct を転用）
+      _sc('conn-direct',      !sO);
+      // 通常の origin → POL は使わない（倉庫経由に変わる）
+      _sc('conn-origin-pol',  true);
+
+      if (sO && sL) {
+        // 出発倉庫 → POL（輸出・D2D・all）
+        _sc('conn-wh-origin-pol', false);
+        _sc('conn-wh-dest',       true);  // 出発倉庫 → dest は不使用
+      } else {
+        // 出発倉庫 → dest 直行（国内）
+        _sc('conn-wh-origin-pol', true);
+        _sc('conn-wh-dest',       !sO || !sT);
+      }
+
+      // POL → POD
+      _sc('conn-pol-pod',     !sL || !sD);
+
+      // POD → 到着倉庫
+      _sc('conn-pod-wh-dest', !showWhDest);
+      // 到着倉庫 → dest
+      _sc('conn-wh-dest-dest',!showWhDest);
+      // POD → dest 直行（到着倉庫がある場合は使わない）
+      _sc('conn-pod-dest',    showWhDest || !sD || !sT);
+
+    } else {
+      // ── 倉庫OFF ──
+      _sc('rn-wh-origin',      true);
+      _sc('rn-wh-dest',        true);
+      _sc('conn-wh-origin-pol',true);
+      _sc('conn-wh-dest',      true);
+      _sc('conn-pod-wh-dest',  true);
+      _sc('conn-wh-dest-dest', true);
+
+      // 直行（domestic）
+      _sc('conn-direct',     !(sO && sT && !sL && !sD));
+      // 集荷地 → POL
+      _sc('conn-origin-pol', !sO || !sL);
+      // POL → POD
+      _sc('conn-pol-pod',    !sL || !sD);
+      // POD → dest
+      _sc('conn-pod-dest',   !sD || !sT);
+    }
+
+    updateRouteModeIcon();
+    updateIncotermsVisual();  // スコープ変更時もインコタームズ表示を更新
+    _applyAllOptConnectors(); // 梱包・通関オプションのコネクター管理
+  }
+
+  function _sc(id, hide) {
+    document.getElementById(id)?.classList.toggle('scope-hidden', hide);
+  }
+
+  // ===== 輸送モードアイコン更新 =====
+  function updateRouteModeIcon() {
+    const mode = document.getElementById('cond-mode')?.value || '';
+    let icon = '🚢';
+    if (mode.includes('航空') || mode.includes('AIR')) icon = '✈️';
+    else if (mode.includes('陸上のみ'))                 icon = '🚛';
+    const el = document.getElementById('route-mode-icon');
+    if (el) el.textContent = icon;
+
+    // ── 輸送モードに基づくコンテナ欄の制限表示 ──
+    // ホワイトリスト方式：FCL または 海上+陸上 のみコンテナ必要
+    // mode が空欄のときは非表示にしない
+    const needsContainer = !mode || mode.includes('FCL') || mode.includes('海上＋陸上');
+    const noContainer = !!mode && !needsContainer;
+    document.querySelectorAll('[data-scope-key="container"]').forEach(el => {
+      // classList と data 属性の両方で制御（CSS競合の保険）
+      el.classList.toggle('mode-hidden', noContainer);
+      if (noContainer) el.setAttribute('data-mode-hidden','1');
+      else              el.removeAttribute('data-mode-hidden');
+    });
+
+    // ヒントスパンの表示切替
+    const modeHint = document.getElementById('mode-container-hint');
+    if (modeHint) modeHint.style.display = noContainer ? '' : 'none';
+  }
+
+  let routeLayoutVertical = true;  // デフォルト：縦表示
+  function toggleRouteLayout() {
+    routeLayoutVertical = !routeLayoutVertical;
+    const milestone = document.getElementById('routeMilestone');
+    const btn = document.getElementById('routeLayoutToggle');
+    milestone?.classList.toggle('vertical', routeLayoutVertical);
+    if (btn) {
+      btn.textContent = routeLayoutVertical ? '↔ 横表示' : '⇅ 縦表示';
+      btn.classList.toggle('active', routeLayoutVertical);
+    }
+    updateIncotermsVisual();  // レイアウト切替後も再適用
+  }
+
+  // ─── 保険付保 ───────────────────────────────────────
+  let insuranceOn = false;
+  function toggleInsurance() {
+    insuranceOn = !insuranceOn;
+    const btn = document.getElementById('insToggleBtn');
+    if (btn) {
+      btn.style.background = insuranceOn ? '#2471a3' : 'transparent';
+      btn.style.color      = insuranceOn ? '#fff'    : '#2471a3';
+    }
+    updateIncotermsVisual();  // 保険区間を再描画
+  }
+
+  // ─── インコタームズ → ノード責任マッピング ────────────
+  // sellerNodes: 売り手責任ノードID配列
+  // transferNode: リスク移転ポイントのノードID
+  // buyerNodes: 買い手責任ノードID配列
+  // autoInsFrom/To: インコタームズ自体に保険義務がある場合の区間
+  const INCOTERMS_ZONES = {
+    'EXW（工場渡し）':           { seller:['rn-origin'],                                        transfer:'rn-origin',  buyer:['rn-pol','rn-pod','rn-dest'], autoIns:null },
+    'FCA（運送人渡し）':         { seller:['rn-origin'],                                        transfer:'rn-pol',     buyer:['rn-pod','rn-dest'],           autoIns:null },
+    'FAS（船側渡し）':           { seller:['rn-origin'],                                        transfer:'rn-pol',     buyer:['rn-pod','rn-dest'],           autoIns:null },
+    'FOB（本船渡し）':           { seller:['rn-origin','rn-pol'],                               transfer:'rn-pol',     buyer:['rn-pod','rn-dest'],           autoIns:null },
+    'CFR（運賃込み）':           { seller:['rn-origin','rn-pol'],                               transfer:'rn-pol',     buyer:['rn-pod','rn-dest'],           autoIns:null },
+    'CIF（運賃・保険料込み）':   { seller:['rn-origin','rn-pol'],                               transfer:'rn-pol',     buyer:['rn-pod','rn-dest'],           autoIns:{from:'rn-pol',to:'rn-pod'} },
+    'CPT（輸送費込み）':         { seller:['rn-origin','rn-pol'],                               transfer:'rn-origin',  buyer:['rn-pod','rn-dest'],           autoIns:null },
+    'CIP（輸送費・保険料込み）': { seller:['rn-origin','rn-pol'],                               transfer:'rn-origin',  buyer:['rn-pod','rn-dest'],           autoIns:{from:'rn-origin',to:'rn-dest'} },
+    'DAP（仕向地持込渡し）':     { seller:['rn-origin','rn-pol','rn-pod'],                      transfer:'rn-dest',    buyer:['rn-dest'],                    autoIns:null },
+    'DPU（荷卸込持込渡し）':     { seller:['rn-origin','rn-pol','rn-pod','rn-dest'],            transfer:'rn-dest',    buyer:[],                             autoIns:null },
+    'DDP（関税込持込渡し）':     { seller:['rn-origin','rn-pol','rn-pod','rn-dest'],            transfer:'rn-dest',    buyer:[],                             autoIns:null },
+  };
+
+  // ノードIDの表示名
+  const NODE_NAMES = {
+    'rn-origin':'集荷地', 'rn-pol':'積み地', 'rn-pod':'揚げ地', 'rn-dest':'納入地',
+    'rn-wh-origin':'倉庫(出発)', 'rn-wh-dest':'倉庫(到着)',
+  };
+
+  /**
+   * インコタームズ select の onchange から呼ばれる wrapper。
+   * updateIncotermsVisual() を実行した後、INCO_TO_SCOPE に基づいて
+   * 作業範囲ボタンを自動切替する（一方向のみ。スコープ変更はインコタームズを変えない）。
+   * setScope() の中で updateIncotermsVisual() が呼ばれるが
+   * setScope() は onIncotermsChange() を呼ばないのでループしない。
+   */
+  function onIncotermsChange() {
+    updateIncotermsVisual(); // ゾーン色のみ更新（マイルストーンは変更しない）
+  }
+
+  function updateIncotermsVisual() {
+    const allNodes = ['rn-origin','rn-wh-origin','rn-customs-e','rn-pol','rn-pod','rn-customs-i','rn-wh-dest','rn-dest'];
+    // 全ノードのゾーンクラスをリセット
+    allNodes.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('rn-seller','rn-buyer','rn-transfer','rn-insured');
+    });
+
+    const incotermsVal = document.getElementById('cond-incoterms')?.value || '';
+    const zone = INCOTERMS_ZONES[incotermsVal];
+    const infoBar = document.getElementById('incotermInfoBar');
+    const insBar  = document.getElementById('insuranceInfoBar');
+
+    // インコタームズが未選択の場合
+    if (!zone) {
+      if (infoBar) infoBar.classList.remove('visible');
+      if (insBar  && !insuranceOn) insBar.classList.remove('visible');
+      _applyIncoFieldRestrictions('');
+      _updateInsuranceBarOnly();
+      return;
+    }
+
+    // ゾーン色付け
+    zone.seller.forEach(id => document.getElementById(id)?.classList.add('rn-seller'));
+    zone.buyer .forEach(id => document.getElementById(id)?.classList.add('rn-buyer'));
+    const trEl = document.getElementById(zone.transfer);
+    if (trEl) {
+      trEl.classList.remove('rn-seller','rn-buyer');
+      trEl.classList.add('rn-transfer');
+    }
+
+    // 保険区間の決定（インコタームズ自動 or 手動付保）
+    let insFrom = null, insTo = null;
+    if (zone.autoIns) { insFrom = zone.autoIns.from; insTo = zone.autoIns.to; }
+    if (insuranceOn)  {
+      // 手動保険はCIF/CIPのautoInsがない場合はデフォルト全区間
+      if (!insFrom) { insFrom = 'rn-origin'; insTo = 'rn-dest'; }
+    }
+    if (insFrom) {
+      // 保険区間内のノードにrn-insuredを付与
+      let inZone = false;
+      allNodes.forEach(id => {
+        if (id === insFrom) inZone = true;
+        if (inZone) document.getElementById(id)?.classList.add('rn-insured');
+        if (id === insTo)   inZone = false;
+      });
+    }
+
+    // インコタームズ情報バー表示
+    const transferName = NODE_NAMES[zone.transfer] || zone.transfer;
+    const sellerLabel  = zone.seller.map(id => NODE_NAMES[id]).filter(Boolean).join('→') || '—';
+    const buyerLabel   = zone.buyer .map(id => NODE_NAMES[id]).filter(Boolean).join('→') || '—';
+    const code = incotermsVal.match(/^[A-Z]+/)?.[0] || incotermsVal.substring(0,3);
+
+    if (infoBar) {
+      document.getElementById('incBadge').textContent = code;
+      document.getElementById('incZoneText').innerHTML =
+        `<span class="inc-zone-seller">🟢 売り手：${sellerLabel}</span>` +
+        `<span class="inc-sep"> → </span>` +
+        `<span class="inc-transfer">🔶 移転：${transferName}</span>` +
+        `<span class="inc-sep"> → </span>` +
+        (buyerLabel !== '—' ? `<span class="inc-zone-buyer">🔵 買い手：${buyerLabel}</span>` : `<span class="inc-zone-seller">🟢 売り手負担（全区間）</span>`);
+      const insLegend = document.getElementById('incInsuranceLegend');
+      if (insLegend) insLegend.style.display = (insFrom ? 'flex' : 'none');
+      infoBar.classList.add('visible');
+    }
+
+    _updateInsuranceBarOnly(insFrom, insTo, zone.autoIns);
+
+    // ── インコタームズに基づく入力欄の制限表示 ──
+    _applyIncoFieldRestrictions(incotermsVal);
+  }
+
+  /**
+   * インコタームズに基づいて不要なフィールドを非表示にする。
+   * FOB/FAS/CFR/CIF は PORT渡し → 「納入地」は不要。
+   * EXW: 売り手責任は工場のみだが見積上は全区間を入力することが多いため
+   *       dest は表示したまま。
+   */
+  function _applyIncoFieldRestrictions(incoVal) {
+    // PORT渡し条件の判定：先頭のASCII大文字だけで比較（全角文字の不一致を回避）
+    const code = (incoVal || '').replace(/[^A-Z]/g, '').slice(0, 3);
+    const hideDest = ['FAS','FOB','CFR','CIF'].includes(code);
+
+    // ① 納入地ノード（rn-dest）: クラスと属性の両方で確実に制御
+    const rnDest = document.getElementById('rn-dest');
+    if (rnDest) {
+      rnDest.classList.toggle('inco-hidden', hideDest);
+      if (hideDest) rnDest.setAttribute('data-inco-hidden','1');
+      else           rnDest.removeAttribute('data-inco-hidden');
+    }
+
+    // ② conn-pod-dest: scope-hidden との競合を避け style.display を直接制御
+    //    （scope-hidden も !important のため、style 属性の !important で上書き）
+    const connPod = document.getElementById('conn-pod-dest');
+    if (connPod) {
+      if (hideDest) {
+        connPod.style.setProperty('display', 'none', 'important');
+      } else {
+        connPod.style.removeProperty('display');
+      }
+    }
+
+    // ③ ヒントスパンの表示切替
+    const hint = document.getElementById('inco-dest-hint');
+    if (hint) hint.style.display = hideDest ? '' : 'none';
+  }
+
+  function _updateInsuranceBarOnly(insFrom, insTo, autoIns) {
+    const insBar = document.getElementById('insuranceInfoBar');
+    const rangeText = document.getElementById('insuranceRangeText');
+    if (!insBar || !rangeText) return;
+    if (insuranceOn || autoIns) {
+      const from = NODE_NAMES[insFrom] || '集荷地';
+      const to   = NODE_NAMES[insTo]   || '納入地';
+      const src  = autoIns ? (insuranceOn ? 'インコタームズ＋手動' : 'インコタームズ自動') : '手動付保';
+      rangeText.textContent = `区間：${from} → ${to}（${src}）`;
+      insBar.classList.add('visible');
+    } else {
+      insBar.classList.remove('visible');
+    }
+  }
+
+  let rowCount = 0;
+  let dragSrcRow = null;
+
+  function curOpts(sel) {
+    return CURRENCIES.map(c =>
+      `<option value="${c}"${c === sel ? ' selected' : ''}>${c}</option>`
+    ).join('');
+  }
+
+  function catOpts(sel) {
+    return CATEGORIES.map(c =>
+      `<option value="${c.value}"${c.value === sel ? ' selected' : ''}>${c.label}</option>`
+    ).join('');
+  }
+
+  function fmt(n) {
+    if (isNaN(n) || n === null) return '—';
+    return n.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  // ========== カテゴリ変更 ==========
+  function onCatChange(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const cat = document.getElementById(`cat-${id}`)?.value;
+    // cat-* クラスを全削除
+    tr.className = tr.className.split(' ').filter(c => !c.startsWith('cat-')).join(' ').trim();
+    if (cat) {
+      const catObj = CATEGORIES.find(c => c.value === cat);
+      if (catObj?.cls) tr.classList.add(catObj.cls);
+    }
+  }
+
+  // ========== 未入力グレーアウト ==========
+  function checkUnfilled(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const nm = document.getElementById(`nm-${id}`);
+    if (!tr || !nm) return;
+    nm.value.trim() === ''
+      ? tr.classList.add('row-unfilled')
+      : tr.classList.remove('row-unfilled');
+  }
+
+  // ========== ドラッグ＆ドロップ ==========
+  function initDrag(tr) {
+    tr.setAttribute('draggable', 'true');
+    tr.addEventListener('dragstart', e => {
+      dragSrcRow = tr;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tr.id);
+      setTimeout(() => tr.classList.add('dragging'), 0);
+    });
+    tr.addEventListener('dragend', () => {
+      tr.classList.remove('dragging');
+      document.querySelectorAll('#tableBody tr').forEach(r =>
+        r.classList.remove('drag-over-top', 'drag-over-bottom'));
+      dragSrcRow = null;
+      updateTotals();
+    });
+    tr.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!dragSrcRow || dragSrcRow === tr) return;
+      const mid = tr.getBoundingClientRect().top + tr.getBoundingClientRect().height / 2;
+      document.querySelectorAll('#tableBody tr').forEach(r =>
+        r.classList.remove('drag-over-top', 'drag-over-bottom'));
+      tr.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+    });
+    tr.addEventListener('dragleave', () =>
+      tr.classList.remove('drag-over-top', 'drag-over-bottom'));
+    tr.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrcRow || dragSrcRow === tr) return;
+      const mid = tr.getBoundingClientRect().top + tr.getBoundingClientRect().height / 2;
+      const tbody = document.getElementById('tableBody');
+      tbody.insertBefore(dragSrcRow, e.clientY < mid ? tr : tr.nextSibling);
+      tr.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+  }
+
+  // ========== 十字キー（↑↓）移動 ==========
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tableBody').addEventListener('keydown', e => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      const el  = e.target;
+      const col = el.dataset.col;
+      if (col === undefined) return;
+      e.preventDefault();
+      const tr    = el.closest('tr');
+      const rows  = Array.from(document.querySelectorAll('#tableBody tr'));
+      const idx   = rows.indexOf(tr);
+      const next  = e.key === 'ArrowUp' ? idx - 1 : idx + 1;
+      if (next >= 0 && next < rows.length) {
+        const nextEl = rows[next].querySelector(`[data-col="${col}"]`);
+        if (nextEl) {
+          nextEl.focus();
+          if (nextEl.type === 'text' || nextEl.type === 'number') nextEl.select();
+        }
+      } else if (e.key === 'ArrowDown' && next === rows.length) {
+        const newId = addRowAfter(tr.id.replace('row-', ''));
+        setTimeout(() => {
+          document.querySelector(`#row-${newId} [data-col="${col}"]`)?.focus();
+        }, 0);
+      }
+    });
+  });
+
+  // ========== 行操作 ==========
+  function noteKeydown(e, id) {
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      const newId = addRowAfter(id);
+      setTimeout(() => document.getElementById(`nm-${newId}`)?.focus(), 0);
+    }
+  }
+
+  function addRowAfter(afterId) {
+    rowCount++;
+    const id = rowCount;
+    const tr = document.createElement('tr');
+    tr.id = `row-${id}`;
+    // 継承元の行からカテゴリ・通貨を取得
+    const srcCat = document.getElementById(`cat-${afterId}`)?.value || '';
+    const srcCur = document.getElementById(`pc-${afterId}`)?.value || 'JPY';
+    tr.innerHTML = buildRowHTML(id, srcCat, srcCur);
+    tr.classList.add('row-unfilled');
+    const refRow = document.getElementById(`row-${afterId}`);
+    if (refRow?.nextSibling) refRow.parentNode.insertBefore(tr, refRow.nextSibling);
+    else if (refRow)         refRow.parentNode.appendChild(tr);
+    else                     document.getElementById('tableBody').appendChild(tr);
+    initDrag(tr);
+    onCatChange(id);  // カテゴリ色を適用
+    onPay(id);
+    return id;
+  }
+
+  function addRow() {
+    rowCount++;
+    const id = rowCount;
+    // 末尾行からカテゴリ・通貨を継承
+    const rows = document.querySelectorAll('#tableBody tr');
+    const lastRow = rows.length ? rows[rows.length - 1] : null;
+    const lastId  = lastRow ? lastRow.id.replace('row-', '') : null;
+    const srcCat  = lastId ? (document.getElementById(`cat-${lastId}`)?.value || '') : '';
+    const srcCur  = lastId ? (document.getElementById(`pc-${lastId}`)?.value  || 'JPY') : 'JPY';
+    const tr = document.createElement('tr');
+    tr.id = `row-${id}`;
+    tr.innerHTML = buildRowHTML(id, srcCat, srcCur);
+    tr.classList.add('row-unfilled');
+    document.getElementById('tableBody').appendChild(tr);
+    initDrag(tr);
+    onCatChange(id);  // カテゴリ色を適用
+    onPay(id);
+  }
+
+  // ========== カテゴリー順ソート ==========
+  function sortByCategory() {
+    const tbody = document.getElementById('tableBody');
+    const rows  = Array.from(tbody.querySelectorAll('tr'));
+    if (rows.length < 2) return;
+    const catOrder = cat => {
+      const idx = CAT_VALUES.indexOf(cat);
+      return idx === -1 ? 999 : idx;
+    };
+    rows.sort((a, b) => {
+      const idA = a.id.replace('row-', '');
+      const idB = b.id.replace('row-', '');
+      const cA  = document.getElementById(`cat-${idA}`)?.value || '';
+      const cB  = document.getElementById(`cat-${idB}`)?.value || '';
+      return catOrder(cA) - catOrder(cB);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+    updateTotals();
+  }
+
+  function buildRowHTML(id, initCat = '', initCur = 'JPY') {
+    return `
+      <td class="handle-cell"><span class="drag-handle" title="ドラッグして並び替え">⠿</span></td>
+      <td class="cat-cell">
+        <select id="cat-${id}" class="w-cat" onchange="onCatChange(${id})" data-col="0">${catOpts(initCat)}</select>
+      </td>
+      <td class="tax-cell">
+        <input type="checkbox" id="tx-${id}" onchange="toggleTax(${id})" title="課税">
+      </td>
+      <td><input type="text"   id="nm-${id}" class="w-name"  placeholder="例）海上運賃"
+            oninput="checkUnfilled(${id})" data-col="1" /></td>
+      <td><input type="number" id="pq-${id}" class="w-qty"   min="0" value="1"
+            oninput="onPay(${id})" data-col="2" /></td>
+      <td><select              id="pc-${id}" class="w-cur"   onchange="onPay(${id})" data-col="3">${curOpts(initCur)}</select></td>
+      <td><input type="number" id="pp-${id}" class="w-price" min="0" value="0"
+            oninput="onPay(${id})" data-col="4" /></td>
+      <td class="cd-cell">
+        <input type="number" id="cd-${id}" class="w-price display-field" value="9999" tabindex="-1" readonly />
+      </td>
+      <td><input type="number" id="bq-${id}" class="w-qty   display-field" value="1"  tabindex="-1" readonly /></td>
+      <td><select              id="bc-${id}" class="w-cur   display-field" tabindex="-1">${curOpts('JPY')}</select></td>
+      <td><input type="number" id="bp-${id}" class="w-price display-field" value="0"  tabindex="-1" readonly data-base="0" /></td>
+      <td><input type="number" id="mk-${id}" class="w-mkup" value="0"
+            oninput="calc(${id})" data-col="5" /></td>
+      <td class="profit-cell profit-zero" id="pr-${id}">0</td>
+      <td><input type="text"   id="nt-${id}" class="w-note"  placeholder="備考"
+            onkeydown="noteKeydown(event,${id})" data-col="6" /></td>
+      <td>
+        <button class="done-btn" id="done-${id}" onclick="toggleDone(${id})" title="処理済みにする（再クリックで解除）">✓</button>
+        <button class="btn-del" onclick="delRow(${id})"       tabindex="-1">削除</button>
+        <button class="btn-ins" onclick="addRowAfter(${id})"  tabindex="-1">＋</button>
+      </td>
+    `;
+  }
+
+  function toggleTax(id) {
+    const tr = document.getElementById(`row-${id}`);
+    const nm = document.getElementById(`nm-${id}`);
+    if (!tr || !nm) return;
+    const checked = document.getElementById(`tx-${id}`)?.checked;
+    if (checked) {
+      tr.classList.add('taxed');
+      if (!nm.value.startsWith('*')) nm.value = '*' + nm.value;
+    } else {
+      tr.classList.remove('taxed');
+      if (nm.value.startsWith('*')) nm.value = nm.value.slice(1);
+    }
+  }
+
+  // ========== 計算 ==========
+  function onPay(id) {
+    const pq = val(`pq-${id}`);
+    const pc = document.getElementById(`pc-${id}`)?.value;
+    const pp = val(`pp-${id}`);
+    const mk = val(`mk-${id}`);
+    const bqEl = document.getElementById(`bq-${id}`);
+    const bcEl = document.getElementById(`bc-${id}`);
+    const bpEl = document.getElementById(`bp-${id}`);
+    if (bqEl) bqEl.value = pq;
+    if (bcEl) bcEl.value = pc;
+    if (bpEl) { bpEl.dataset.base = pp; bpEl.value = pp + mk; }
+    calc(id);
+  }
+
+  function calc(id) {
+    const pq = val(`pq-${id}`);
+    const pp = val(`pp-${id}`);
+    const bq = val(`bq-${id}`);
+    const mk = val(`mk-${id}`);
+    const bpEl = document.getElementById(`bp-${id}`);
+    if (bpEl) bpEl.value = (parseFloat(bpEl.dataset.base) || 0) + mk;
+    const bp = val(`bp-${id}`);
+    const profit = bq * bp - pq * pp;
+    const pr = document.getElementById(`pr-${id}`);
+    pr.textContent = fmt(profit);
+    pr.className   = `profit-cell ${pClass(profit)}`;
+    updateTotals();
+  }
+
+  function pClass(p) {
+    return p > 0 ? 'profit-pos' : p < 0 ? 'profit-neg' : 'profit-zero';
+  }
+
+  function val(id) {
+    return parseFloat(document.getElementById(id)?.value) || 0;
+  }
+
+  function updateTotals() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    if (!rows.length) {
+      ['tot-billing','tot-markup','tot-profit'].forEach(id =>
+        document.getElementById(id).textContent = '—');
+      document.getElementById('tot-profit').className = 'profit-cell profit-zero';
+      return;
+    }
+    let totCost = 0, totBill = 0, totMk = 0;
+    rows.forEach(tr => {
+      const id = tr.id.replace('row-', '');
+      totCost += val(`pq-${id}`) * val(`pp-${id}`);
+      totBill += val(`bq-${id}`) * val(`bp-${id}`);
+      totMk   += val(`mk-${id}`);
+    });
+    const totPr = totBill - totCost;
+    document.getElementById('tot-billing').textContent = fmt(totBill);
+    document.getElementById('tot-markup').textContent  = fmt(totMk);
+    const pEl = document.getElementById('tot-profit');
+    pEl.textContent = fmt(totPr);
+    pEl.className   = `profit-cell ${pClass(totPr)}`;
+  }
+
+  function delRow(id) {
+    document.getElementById(`row-${id}`)?.remove();
+    updateTotals();
+  }
+
+  function resetAll() {
+    if (!confirm('すべての行を削除してリセットしますか？')) return;
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    updateTotals();
+  }
+
+  // ========== プレビュー＆エクスポート ==========
+  function getQuoteHeader() {
+    return {
+      ref:      document.getElementById('qf-ref')?.value || '',
+      customer: document.getElementById('qf-customer')?.value || '',
+      person:   document.getElementById('qf-person')?.value || '',
+    };
+  }
+
+  function collectData() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    const data = [];
+    rows.forEach(tr => {
+      const id     = tr.id.replace('row-', '');
+      const taxed  = document.getElementById(`tx-${id}`)?.checked || false;
+      const cat    = document.getElementById(`cat-${id}`)?.value || '';
+      const name   = document.getElementById(`nm-${id}`)?.value || '';
+      const pq     = val(`pq-${id}`);
+      const pc     = document.getElementById(`pc-${id}`)?.value || '';
+      const pp     = val(`pp-${id}`);
+      const cd     = val(`cd-${id}`);
+      const bq     = val(`bq-${id}`);
+      const bc     = document.getElementById(`bc-${id}`)?.value || '';
+      const bp     = val(`bp-${id}`);
+      const mk     = val(`mk-${id}`);
+      const cost   = pq * pp;
+      const bill   = bq * bp;
+      const profit = bill - cost;
+      const note   = document.getElementById(`nt-${id}`)?.value || '';
+      data.push({ taxed, cat, name, pq, pc, pp, cd, bq, bc, bp, mk, cost, bill, profit, note });
+    });
+    return data;
+  }
+
+  function getCatLabel(v) {
+    return CATEGORIES.find(c => c.value === v)?.label || '';
+  }
+
+  function openPreview() {
+    const data = collectData();
+    if (!data.length) { alert('行がありません。'); return; }
+    const hdr = getQuoteHeader();
+    let totCost = 0, totBill = 0, totMk = 0;
+    data.forEach(d => { totCost += d.cost; totBill += d.bill; totMk += d.mk; });
+    const totPr = totBill - totCost;
+
+    const metaEl = document.getElementById('pvMeta');
+    const metaHTML = [
+      hdr.ref      ? `<div class="pv-meta-item"><span class="lbl">仮 REF #</span><span class="val">${escHtml(hdr.ref)}</span></div>` : '',
+      hdr.customer ? `<div class="pv-meta-item"><span class="lbl">引き合い元</span><span class="val">${escHtml(hdr.customer)}</span></div>` : '',
+      hdr.person   ? `<div class="pv-meta-item"><span class="lbl">担当</span><span class="val">${escHtml(hdr.person)}</span></div>` : '',
+    ].join('');
+    metaEl.innerHTML = metaHTML;
+    metaEl.style.display = metaHTML ? 'flex' : 'none';
+
+    let html = `<table id="previewTable">
+      <thead><tr>
+        <th>カテゴリ</th><th>項目名</th>
+        <th class="ph-pay">数量</th><th class="ph-pay">通貨</th>
+        <th class="ph-pay">単価</th><th class="ph-pay" style="color:#ccc;">CD</th>
+        <th class="ph-bill">数量</th><th class="ph-bill">通貨</th><th class="ph-bill">単価</th>
+        <th class="ph-profit">乗せ幅</th><th class="ph-profit">利益</th><th class="ph-profit">備考</th>
+      </tr></thead><tbody>`;
+
+    data.forEach(d => {
+      const pc      = d.profit > 0 ? 'pv-pos' : d.profit < 0 ? 'pv-neg' : 'pv-zero';
+      const nameCls = d.taxed ? 'pv-name pv-taxed' : 'pv-name';
+      html += `<tr>
+        <td class="pv-name" style="font-size:11px;">${escHtml(getCatLabel(d.cat))}</td>
+        <td class="${nameCls}">${escHtml(d.name)}</td>
+        <td class="pv-num">${fmtRaw(d.pq)}</td><td>${escHtml(d.pc)}</td>
+        <td class="pv-num">${fmtRaw(d.pp)}</td>
+        <td class="pv-cd pv-num">${fmtRaw(d.cd)}</td>
+        <td class="pv-num">${fmtRaw(d.bq)}</td><td>${escHtml(d.bc)}</td>
+        <td class="pv-num">${fmtRaw(d.bp)}</td>
+        <td class="pv-num">${fmtRaw(d.mk)}</td>
+        <td class="pv-pr ${pc} pv-num">${fmtRaw(d.profit)}</td>
+        <td class="pv-name">${escHtml(d.note)}</td>
+      </tr>`;
+    });
+
+    const totPc = totPr > 0 ? 'pv-pos' : totPr < 0 ? 'pv-neg' : 'pv-zero';
+    html += `</tbody><tfoot><tr class="pv-total">
+      <td colspan="2" style="text-align:right;">合　計</td>
+      <td colspan="3">—</td><td style="background:#e8e8e8;color:#aaa;">—</td>
+      <td colspan="2">—</td><td class="pv-num">—</td>
+      <td class="pv-num">${fmtRaw(totMk)}</td>
+      <td class="pv-pr ${totPc} pv-num">${fmtRaw(totPr)}</td>
+      <td></td>
+    </tr></tfoot></table>`;
+
+    document.getElementById('previewTableWrap').innerHTML = html;
+
+    const cond = getConditions();
+    const condFields = [
+      { lbl: '積み地',         val: cond.pol },
+      { lbl: '揚げ地',         val: cond.pod },
+      { lbl: '集荷地',         val: cond.origin },
+      { lbl: '納入地',         val: cond.dest },
+      { lbl: 'インコタームズ', val: cond.incoterms },
+      { lbl: '輸送モード',     val: cond.mode },
+      { lbl: 'コンテナ',       val: cond.container },
+      { lbl: '作業範囲',       val: cond.scope },
+      { lbl: '貨物名',         val: cond.cargo },
+      { lbl: '重量',           val: cond.weight },
+      { lbl: '容積',           val: cond.volume },
+      { lbl: '荷姿',           val: cond.packing },
+      { lbl: '危険品',         val: cond.hazmat },
+      { lbl: 'ETD',            val: cond.etd },
+      { lbl: 'ETA',            val: cond.eta },
+      { lbl: '緊急度',         val: cond.urgency },
+    ].filter(f => f.val);
+
+    const pvCond = document.getElementById('pvCondBox');
+    if (condFields.length || cond.free) {
+      let condHtml = condFields.map(f =>
+        `<div class="pv-cond-item"><span class="pv-cond-lbl">${escHtml(f.lbl)}：</span><span class="pv-cond-val">${escHtml(f.val)}</span></div>`
+      ).join('');
+      pvCond.innerHTML = `<strong>🚢 引き合い条件</strong><div class="pv-cond-grid">${condHtml}</div>`;
+      if (cond.free) pvCond.innerHTML += `<div class="pv-cond-free">${escHtml(cond.free)}</div>`;
+      pvCond.style.display = 'block';
+    } else {
+      pvCond.style.display = 'none';
+    }
+
+    const remarkText = getRemarkText();
+    const pvRemark = document.getElementById('pvRemarkBox');
+    if (remarkText) {
+      pvRemark.style.display = 'block';
+      pvRemark.innerHTML = `<strong>📝 条件・リマーク</strong>${escHtml(remarkText)}`;
+    } else {
+      pvRemark.style.display = 'none';
+    }
+    document.getElementById('previewOverlay').classList.add('open');
+  }
+
+  function closePreview()  { document.getElementById('previewOverlay').classList.remove('open'); }
+  function overlayClick(e) { if (e.target === document.getElementById('previewOverlay')) closePreview(); }
+
+  function copyTSV() {
+    const data = collectData();
+    if (!data.length) return;
+    const hdr = getQuoteHeader();
+    let totCost = 0, totBill = 0, totMk = 0;
+    data.forEach(d => { totCost += d.cost; totBill += d.bill; totMk += d.mk; });
+    const totPr = totBill - totCost;
+    const lines = [];
+    if (hdr.ref || hdr.customer || hdr.person) {
+      if (hdr.ref)      lines.push(`仮REF#\t${hdr.ref}`);
+      if (hdr.customer) lines.push(`引き合い元\t${hdr.customer}`);
+      if (hdr.person)   lines.push(`担当\t${hdr.person}`);
+      lines.push('');
+    }
+    lines.push(['カテゴリ','項目名','数量','通貨','単価','CD','数量','通貨','単価','乗せ幅','利益','備考'].join('\t'));
+    data.forEach(d => lines.push([
+      getCatLabel(d.cat), d.name, fmtRaw(d.pq), d.pc, fmtRaw(d.pp), fmtRaw(d.cd),
+      fmtRaw(d.bq), d.bc, fmtRaw(d.bp), fmtRaw(d.mk), fmtRaw(d.profit), d.note
+    ].join('\t')));
+    lines.push(['合計','','','','','—','','','',fmtRaw(totMk),fmtRaw(totPr),''].join('\t'));
+    const remarkText = getRemarkText();
+    if (remarkText) {
+      lines.push('');
+      lines.push('【条件・リマーク】');
+      remarkText.split('\n').forEach(l => { if (l.trim()) lines.push(l); });
+    }
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      const msg = document.getElementById('copyMsg');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2500);
+      showToast('📋 クリップボードにコピーしました！', 'success');
+    }).catch(() => { alert('コピーに失敗しました。'); showToast('⚠️ コピーに失敗しました', 'error'); });
+  }
+
+  function downloadCSV() {
+    const data = collectData();
+    if (!data.length) { alert('行がありません。'); return; }
+    const hdr = getQuoteHeader();
+    const headerRow = ['カテゴリ(raw)','項目名','数量','通貨','単価','CD','数量(請求)','通貨(請求)','単価(請求)','乗せ幅','利益','備考'].map(csvEsc).join(',');
+    const dataRows  = data.map(d =>
+      [d.cat, d.name, fmtRaw(d.pq), d.pc, fmtRaw(d.pp), fmtRaw(d.cd),
+       fmtRaw(d.bq), d.bc, fmtRaw(d.bp), fmtRaw(d.mk), fmtRaw(d.profit), d.note].map(csvEsc).join(',')
+    );
+    const BOM  = '﻿';
+    const blob = new Blob([BOM + [headerRow, ...dataRows].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = (hdr.ref ? hdr.ref + '_' : '') + '見積もり.csv';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  // ========== CSV読み込み ==========
+  function toggleCsvZone() {
+    const zone = document.getElementById('csvDropZone');
+    const msg  = document.getElementById('csvMsg');
+    zone.style.display = zone.style.display === 'block' ? 'none' : 'block';
+    msg.className = ''; msg.textContent = '';
+  }
+  function onDragOver(e)  { e.preventDefault(); document.getElementById('csvDropZone').classList.add('active'); }
+  function onDragLeave()  { document.getElementById('csvDropZone').classList.remove('active'); }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('csvDropZone').classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (file) parseCSVFile(file);
+  }
+  function loadCSV(e) {
+    const file = e.target.files[0];
+    if (file) parseCSVFile(file);
+    e.target.value = '';
+  }
+
+  function parseCSVFile(file) {
+    if (!file.name.endsWith('.csv')) {
+      showCsvMsg('error', '⚠️ CSVファイル（.csv）を選択してください'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        let text = ev.target.result.replace(/^﻿/, '');
+        const rows = parseCSVText(text);
+        if (!rows.length) { showCsvMsg('error', '⚠️ データが見つかりませんでした'); return; }
+        let dataRows = rows;
+        if (rows[0][0] && isNaN(parseFloat(rows[0][0]))) dataRows = rows.slice(1);
+        dataRows = dataRows.filter(r => r[0] && r[0] !== '合計' && !r[0].startsWith('カテゴリ'));
+        if (!dataRows.length) { showCsvMsg('error', '⚠️ 有効なデータ行がありませんでした'); return; }
+
+        // 先頭列がカテゴリのraw値なら新フォーマット
+        const isNewFmt = CAT_VALUES.includes(dataRows[0][0]);
+        const off = isNewFmt ? 1 : 0;
+        let added = 0;
+        dataRows.forEach(cols => {
+          rowCount++;
+          const id = rowCount;
+          const tr = document.createElement('tr');
+          tr.id = `row-${id}`;
+          tr.innerHTML = buildRowHTML(id);
+          document.getElementById('tableBody').appendChild(tr);
+          initDrag(tr);
+
+          const cat     = isNewFmt ? (cols[0] || '') : '';
+          const rawName = cols[0 + off] || '';
+          const taxed   = rawName.startsWith('*');
+          const name    = taxed ? rawName.slice(1) : rawName;
+          const pq = parseFloat(cols[1 + off]) || 1;
+          const pc = cols[2 + off] || 'JPY';
+          const pp = parseFloat(cols[3 + off]) || 0;
+          const mk = parseFloat(cols[8 + off]) || 0;
+          const nt = cols[10 + off] || '';
+
+          document.getElementById(`nm-${id}`).value = name;
+          document.getElementById(`pq-${id}`).value = pq;
+          document.getElementById(`pp-${id}`).value = pp;
+          document.getElementById(`mk-${id}`).value = mk;
+          document.getElementById(`nt-${id}`).value = nt;
+          const pcEl = document.getElementById(`pc-${id}`);
+          if (pcEl && CURRENCIES.includes(pc)) pcEl.value = pc;
+          if (cat && CAT_VALUES.includes(cat)) {
+            document.getElementById(`cat-${id}`).value = cat;
+            onCatChange(id);
+          }
+          if (taxed) { document.getElementById(`tx-${id}`).checked = true; toggleTax(id); }
+          checkUnfilled(id);
+          onPay(id);
+          added++;
+        });
+        showCsvMsg('success', `✅ ${added}行を読み込みました！`);
+      } catch (err) {
+        showCsvMsg('error', `⚠️ 読み込みエラー：${err.message}`);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function parseCSVText(text) {
+    const rows = [];
+    text.split(/\r?\n/).forEach(line => {
+      if (!line.trim()) return;
+      const cols = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (inQ) {
+          if (c === '"' && line[i+1] === '"') { cur += '"'; i++; }
+          else if (c === '"') { inQ = false; }
+          else cur += c;
+        } else {
+          if (c === '"') inQ = true;
+          else if (c === ',') { cols.push(cur); cur = ''; }
+          else cur += c;
+        }
+      }
+      cols.push(cur);
+      rows.push(cols);
+    });
+    return rows;
+  }
+
+  function showCsvMsg(type, text) {
+    const el = document.getElementById('csvMsg');
+    el.className = type; el.textContent = text;
+    setTimeout(() => { el.className = ''; el.textContent = ''; }, 4000);
+  }
+
+  // ========== サイズ計算 ==========
+  let calcRowCount = 0;
+
+  function addCalcRow() {
+    calcRowCount++;
+    const n  = calcRowCount;
+    const tr = document.createElement('tr');
+    tr.id    = `calc-row-${n}`;
+    tr.innerHTML = `
+      <td><input type="number" class="calc-pcs" min="1"  value="1" oninput="calcLiveUpdate()" /></td>
+      <td><input type="number" class="calc-l"   min="0"  value="" placeholder="0" oninput="calcLiveUpdate()" /></td>
+      <td><input type="number" class="calc-w"   min="0"  value="" placeholder="0" oninput="calcLiveUpdate()" /></td>
+      <td><input type="number" class="calc-h"   min="0"  value="" placeholder="0" oninput="calcLiveUpdate()" /></td>
+      <td class="cbm-result" id="cbm-sub-${n}">—</td>
+      <td><input type="number" class="calc-kg"  min="0"  value="" placeholder="0" oninput="calcLiveUpdate()" /></td>
+      <td><button class="btn-calc-row-del" onclick="delCalcRow(${n})" title="削除">✕</button></td>
+    `;
+    document.getElementById('calcBody').appendChild(tr);
+  }
+
+  function delCalcRow(n) {
+    document.getElementById(`calc-row-${n}`)?.remove();
+    calcLiveUpdate();
+  }
+
+  function calcLiveUpdate() {
+    document.querySelectorAll('#calcBody tr').forEach(tr => {
+      const pcs = parseFloat(tr.querySelector('.calc-pcs')?.value) || 0;
+      const l   = parseFloat(tr.querySelector('.calc-l')?.value)   || 0;
+      const w   = parseFloat(tr.querySelector('.calc-w')?.value)   || 0;
+      const h   = parseFloat(tr.querySelector('.calc-h')?.value)   || 0;
+      const sub = tr.querySelector('.cbm-result');
+      if (sub) sub.textContent = (l && w && h) ? (pcs * l * w * h / 1_000_000).toFixed(4) : '—';
+    });
+  }
+
+  function suggestContainers(cbm, kg) {
+    if (cbm === 0 && kg === 0) return '—';
+    const specs = [
+      { name: "20'GP", cbm: 25,  kg: 21500 },
+      { name: "40'GP", cbm: 57,  kg: 26500 },
+      { name: "40'HQ", cbm: 67,  kg: 26500 },
+    ];
+    return specs.map(s => {
+      const n = Math.max(cbm > 0 ? Math.ceil(cbm / s.cbm) : 0,
+                         kg  > 0 ? Math.ceil(kg  / s.kg)  : 0);
+      return `${s.name} × ${n}`;
+    }).join(' &nbsp;/&nbsp; ');
+  }
+
+  function runCalc() {
+    const rows = document.querySelectorAll('#calcBody tr');
+    if (!rows.length) { alert('荷物の行を追加してください。'); return; }
+    let totalCBM = 0, totalKg = 0, totalPcs = 0;
+    rows.forEach(tr => {
+      const pcs = parseFloat(tr.querySelector('.calc-pcs')?.value) || 0;
+      const l   = parseFloat(tr.querySelector('.calc-l')?.value)   || 0;
+      const w   = parseFloat(tr.querySelector('.calc-w')?.value)   || 0;
+      const h   = parseFloat(tr.querySelector('.calc-h')?.value)   || 0;
+      const kg  = parseFloat(tr.querySelector('.calc-kg')?.value)  || 0;
+      totalCBM += pcs * l * w * h / 1_000_000;
+      totalKg  += kg;
+      totalPcs += pcs;
+    });
+
+    // RT: max(W/1000, CBM)  / CW: max(実重量, CBM×167)
+    const rt = Math.max(totalKg / 1000, totalCBM);
+    const cw = Math.max(totalKg, totalCBM * 167);
+
+    // 貨物情報に空のときだけ自動反映
+    const wEl = document.getElementById('cond-weight');
+    const vEl = document.getElementById('cond-volume');
+    if (wEl && !wEl.value) wEl.value = `${totalKg.toLocaleString()} kg`;
+    if (vEl && !vEl.value) vEl.value = `${totalCBM.toFixed(3)} CBM`;
+
+    document.getElementById('calcResultsGrid').innerHTML = `
+      <div class="calc-result-item">
+        <span class="calc-r-lbl">総個数</span>
+        <span class="calc-r-val">${totalPcs.toLocaleString()} pcs</span>
+      </div>
+      <div class="calc-result-item">
+        <span class="calc-r-lbl">総 CBM</span>
+        <span class="calc-r-val hl-blue">${totalCBM.toFixed(4)} CBM</span>
+      </div>
+      <div class="calc-result-item">
+        <span class="calc-r-lbl">総重量</span>
+        <span class="calc-r-val">${totalKg.toLocaleString()} kg</span>
+      </div>
+      <div class="calc-result-item">
+        <span class="calc-r-lbl">RT（海上）</span>
+        <span class="calc-r-val hl-blue">${rt.toFixed(4)} R/T</span>
+      </div>
+      <div class="calc-result-item">
+        <span class="calc-r-lbl">CW（航空）</span>
+        <span class="calc-r-val hl-green">${Math.ceil(cw).toLocaleString()} kg</span>
+      </div>
+      <div class="calc-result-item">
+        <span class="calc-r-lbl">コンテナ目安</span>
+        <span class="calc-r-val hl-orange" style="font-size:12px;">${suggestContainers(totalCBM, totalKg)}</span>
+      </div>
+    `;
+
+    buildReflectSelects(rt, cw, totalCBM, totalKg, totalPcs);
+    document.getElementById('calcResultsPanel').style.display = 'block';
+  }
+
+  function buildReflectSelects(rt, cw, cbm, kg, pcs) {
+    const quoteRows = document.querySelectorAll('#tableBody tr');
+    const opts = quoteRows.length
+      ? Array.from(quoteRows).map(tr => {
+          const id = tr.id.replace('row-', '');
+          const nm = document.getElementById(`nm-${id}`)?.value || '（名前なし）';
+          return `<option value="${id}">${escHtml(nm)}</option>`;
+        }).join('')
+      : '';
+
+    if (!opts) {
+      document.getElementById('calcReflectRows').innerHTML =
+        '<p style="font-size:11px;color:#aaa;margin:4px 0;">見積もり行がありません</p>';
+      return;
+    }
+
+    const mkRow = (label, value, unit, key) => `
+      <div class="calc-reflect-row">
+        <span class="calc-reflect-lbl">${label}：<strong>${value} ${unit}</strong></span>
+        <select class="calc-row-select" id="refl-sel-${key}">
+          <option value="">— 行を選択 —</option>${opts}
+        </select>
+        <button class="btn-do-reflect" onclick="doReflect('${key}', ${value})">反映</button>
+      </div>`;
+
+    document.getElementById('calcReflectRows').innerHTML =
+      mkRow('RT（海上）',  rt.toFixed(4),          'R/T', 'rt')  +
+      mkRow('CW（航空）',  Math.ceil(cw),           'kg',  'cw')  +
+      mkRow('CBM',         cbm.toFixed(4),          'CBM', 'cbm') +
+      mkRow('総重量',       Math.round(kg),          'kg',  'kg')  +
+      mkRow('個数',         pcs,                    'pcs', 'pcs');
+  }
+
+  function doReflect(key, value) {
+    const sel   = document.getElementById(`refl-sel-${key}`);
+    const rowId = sel?.value;
+    if (!rowId) { alert('反映先の行を選択してください'); return; }
+    const qtyEl = document.getElementById(`pq-${rowId}`);
+    if (qtyEl) {
+      qtyEl.value = value;
+      onPay(parseInt(rowId));
+      sel.value = '';
+      qtyEl.classList.add('flash-reflect');
+      setTimeout(() => qtyEl.classList.remove('flash-reflect'), 900);
+    }
+  }
+
+  // ========== リマーク欄 ==========
+  const PRESETS = [
+    { label: '📅 有効期限',        text: '本見積もりの有効期限は発行日より30日間とします。' },
+    { label: '💱 為替変動',        text: '外貨建て料金は見積もり時の為替レートを基準としており、船積み時のレートにより変動します。' },
+    { label: '⛽ 燃油サーチャージ', text: '燃油サーチャージ（BAF/FAF）は市況により変動します。適用時点のレートを別途申し受けます。' },
+    { label: '🚢 スペース確保',     text: '船腹・航空スペースの確保は保証できません。手配状況により変更となる場合があります。' },
+    { label: '📦 重量・容積',      text: '運賃はW/Mの高い方を適用します（海上：1CBM＝1,000kg、航空：1CBM＝167kg）。' },
+    { label: '🛃 通関費用',        text: '通関費用・関税・消費税等は本見積もりに含まれておりません。' },
+    { label: '🛡️ 貨物保険',       text: '貨物保険料は含まれておりません。付保をご希望の場合は別途ご相談ください。' },
+    { label: '⚓ 港湾混雑',        text: '港湾混雑・ストライキ・天災等による遅延・追加費用は含まれておりません。' },
+    { label: '☣️ 危険品',         text: '危険品・温度管理貨物・特殊貨物については別途ご相談ください。条件が異なります。' },
+    { label: '🔄 条件変更',        text: '貨物の内容・数量・仕向地等に変更が生じた場合は再見積となります。' },
+    { label: '📋 書類締切',        text: 'B/L・AWB等の書類提出締め切りは船会社・航空会社の指定期日に従います。遅延の場合は追加費用が発生します。' },
+    { label: '🏦 支払条件',        text: '支払いは請求書発行後30日以内とします。期日を超過した場合、年利○%の遅延損害金が発生します。' },
+  ];
+
+  let remarkOpen = true;
+
+  function initRemarks() {
+    const wrap = document.getElementById('presetBtns');
+    PRESETS.forEach((p, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.textContent = p.label;
+      btn.dataset.index = i;
+      btn.onclick = () => togglePreset(i, btn);
+      wrap.appendChild(btn);
+    });
+    document.getElementById('remarkTextarea').addEventListener('input', updateRemarkChar);
+    updateRemarkChar();
+  }
+
+  function togglePreset(i, btn) {
+    const ta = document.getElementById('remarkTextarea');
+    const text = PRESETS[i].text;
+    if (btn.classList.contains('active')) {
+      ta.value = ta.value.split('\n').filter(l => l.trim() !== text.trim()).join('\n').replace(/^\n+|\n+$/g, '');
+      btn.classList.remove('active');
+    } else {
+      const cur = ta.value.trim();
+      ta.value = cur ? cur + '\n' + text : text;
+      btn.classList.add('active');
+    }
+    updateRemarkChar();
+  }
+
+  function clearRemark() {
+    if (!confirm('リマーク欄をクリアしますか？')) return;
+    document.getElementById('remarkTextarea').value = '';
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    updateRemarkChar();
+  }
+
+  function updateRemarkChar() {
+    document.getElementById('remarkChar').textContent =
+      `${document.getElementById('remarkTextarea').value.length}文字`;
+  }
+
+  function toggleRemarkBody() {
+    remarkOpen = !remarkOpen;
+    document.getElementById('remarkBody').style.display = remarkOpen ? '' : 'none';
+    document.getElementById('remarkToggleIcon').textContent = remarkOpen ? '▼' : '▶';
+  }
+
+  function getRemarkText() {
+    return document.getElementById('remarkTextarea')?.value.trim() || '';
+  }
+
+  function csvEsc(v) {
+    const s = String(v == null ? '' : v);
+    return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r'))
+      ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function fmtRaw(n) {
+    if (isNaN(n) || n === null) return '';
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ========== 引き合い条件 ==========
+  let condOpen = true;
+
+  function toggleCondBody() {
+    condOpen = !condOpen;
+    document.getElementById('condBody').style.display = condOpen ? '' : 'none';
+    document.getElementById('condToggleIcon').textContent = condOpen ? '▼' : '▶';
+  }
+
+  // ========== セクション開閉（汎用） ==========
+  function toggleSection(bodyId, toggleId) {
+    const body   = document.getElementById(bodyId);
+    const toggle = document.getElementById(toggleId);
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display   = open ? 'none' : '';
+    if (toggle) toggle.textContent = open ? '▶' : '▼';
+  }
+
+  function clearConditions() {
+    if (!confirm('貨物情報・引き合い条件をクリアしますか？')) return;
+    ['cond-pol','cond-pod','cond-origin','cond-dest','cond-cargo',
+     'cond-weight','cond-volume','cond-packing','condFreeText',
+     'cond-origin-country','cond-dest-country']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['cond-incoterms','cond-mode','cond-container','cond-hazmat']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('calcResultsPanel').style.display = 'none';
+    updateIncotermsVisual();
+  }
+
+  function getConditions() {
+    const g = id => document.getElementById(id)?.value.trim() || '';
+    return {
+      pol: g('cond-pol'), pod: g('cond-pod'), origin: g('cond-origin'), dest: g('cond-dest'),
+      incoterms: g('cond-incoterms'), mode: g('cond-mode'), container: g('cond-container'),
+      cargo: g('cond-cargo'), weight: g('cond-weight'),
+      volume: g('cond-volume'), packing: g('cond-packing'), hazmat: g('cond-hazmat'),
+      free: g('condFreeText'),
+    };
+  }
+
+  // ========== セクション並び替え（D&D） ==========
+  const SECTION_IDS = ['section-ref','section-cond','section-cargo','section-table','section-free','section-remark'];
+  let dragSrcSection = null;
+
+  function initSectionDnD() {
+    SECTION_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('dragstart', e => {
+        // ドラッグハンドル以外では開始しない
+        if (!e.target.closest('.drag-handle') && e.target !== el) {
+          // h2 クリックによる開閉と区別するために target チェック
+          const handle = el.querySelector('.drag-handle');
+          if (handle && !handle.contains(e.target)) { e.preventDefault(); return; }
+        }
+        dragSrcSection = el;
+        setTimeout(() => el.classList.add('section-dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', () => {
+        el.classList.remove('section-dragging', 'section-drag-over');
+        dragSrcSection = null;
+        saveSectionOrder();
+      });
+      el.addEventListener('dragover', e => {
+        if (!dragSrcSection || dragSrcSection === el) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.section-drag-over').forEach(x => x.classList.remove('section-drag-over'));
+        el.classList.add('section-drag-over');
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('section-drag-over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.classList.remove('section-drag-over');
+        if (!dragSrcSection || dragSrcSection === el) return;
+        const parent = el.parentNode;
+        const srcIdx  = Array.from(parent.children).indexOf(dragSrcSection);
+        const destIdx = Array.from(parent.children).indexOf(el);
+        if (srcIdx < destIdx) parent.insertBefore(dragSrcSection, el.nextSibling);
+        else                  parent.insertBefore(dragSrcSection, el);
+      });
+    });
+  }
+
+  function saveSectionOrder() {
+    const order = SECTION_IDS
+      .map(id => document.getElementById(id))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const els = Array.from(document.body.children);
+        return els.indexOf(a) - els.indexOf(b);
+      })
+      .map(el => el.id);
+    localStorage.setItem('sectionOrder', JSON.stringify(order));
+  }
+
+  function restoreSectionOrder() {
+    const saved = localStorage.getItem('sectionOrder');
+    if (!saved) return;
+    try {
+      const order = JSON.parse(saved);
+      order.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) document.body.appendChild(el);
+      });
+    } catch(e) {}
+  }
+
+  // ========== データ保存・読み込み（localStorage） ==========
+  let autoSaveTimer = null;
+  let autoSaveEnabled = false;
+
+  function toggleAutoSave(on) {
+    autoSaveEnabled = on;
+    if (on) { saveData(true); showSaveStatus('自動保存 ON'); }
+    else    { showSaveStatus('自動保存 OFF'); }
+    localStorage.setItem('autoSaveEnabled', on ? '1' : '0');
+  }
+
+  function scheduleAutoSave() {
+    if (!autoSaveEnabled) return;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => saveData(true), 2000);
+  }
+
+  function gatherAllData() {
+    // フォーム値
+    const fields = {};
+    document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+      if (['csvFileInput','importFileInput','autoSaveChk','fbSubject','fbBody'].includes(el.id)) return;
+      fields[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    // テーブル行
+    const rows = [];
+    document.querySelectorAll('#tableBody tr').forEach(tr => {
+      const cells = [];
+      tr.querySelectorAll('input, select, textarea').forEach(el => cells.push(el.value));
+      rows.push(cells);
+    });
+    return { fields, rows, ts: new Date().toISOString() };
+  }
+
+  function saveData(silent = false) {
+    try {
+      localStorage.setItem('quoteData', JSON.stringify(gatherAllData()));
+      if (!silent) {
+        showSaveStatus('✅ 保存しました ' + new Date().toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}));
+        showToast('💾 データを保存しました', 'success');
+      }
+    } catch(e) { showSaveStatus('⚠️ 保存失敗: ' + e.message); }
+  }
+
+  function loadData() {
+    const raw = localStorage.getItem('quoteData');
+    if (!raw) { alert('保存データが見つかりません。'); return; }
+    let data;
+    try { data = JSON.parse(raw); } catch(e) { alert('データの読み込みに失敗しました。'); return; }
+    const ts = data.ts ? new Date(data.ts).toLocaleString('ja-JP') : '不明';
+    if (!confirm(`保存日時: ${ts}\n\n現在のデータを上書きして読み込みますか？`)) return;
+    // フォーム復元
+    Object.entries(data.fields || {}).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = val;
+      else el.value = val;
+    });
+    // テーブル行復元
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    (data.rows || []).forEach(() => addRow());
+    const trs = document.querySelectorAll('#tableBody tr');
+    (data.rows || []).forEach((cells, i) => {
+      if (!trs[i]) return;
+      trs[i].querySelectorAll('input, select, textarea').forEach((el, j) => {
+        if (cells[j] !== undefined) el.value = cells[j];
+      });
+    });
+    updateTotals();
+    updateIncotermsVisual();
+    updateRouteModeIcon();
+    showSaveStatus('📂 読み込みました');
+  }
+
+  function clearSavedData() {
+    if (!confirm('保存データを削除しますか？\n（現在の画面の内容は変わりません）')) return;
+    localStorage.removeItem('quoteData');
+    showSaveStatus('🗑️ 保存データ削除');
+  }
+
+  function showSaveStatus(msg) {
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3500);
+  }
+
+  // ========== フィードバック ==========
+  const FB_EMAIL = 'shogo.a68@gmail.com';
+
+  function openFeedback() {
+    const overlay = document.getElementById('fbOverlay');
+    if (overlay) { overlay.style.display = 'flex'; document.getElementById('fbBody').focus(); }
+  }
+  function closeFeedback(e) {
+    if (e && e.target !== document.getElementById('fbOverlay')) return;
+    document.getElementById('fbOverlay').style.display = 'none';
+  }
+  function sendFeedback() {
+    const subj = encodeURIComponent(document.getElementById('fbSubject').value || '見積支援ツール フィードバック');
+    const body = encodeURIComponent(document.getElementById('fbBody').value || '');
+    if (!body) { alert('内容を入力してください。'); return; }
+    window.location.href = `mailto:${FB_EMAIL}?subject=${subj}&body=${body}`;
+    document.getElementById('fbOverlay').style.display = 'none';
+    document.getElementById('fbBody').value = '';
+  }
+
+  // 入力変化で自動保存をトリガー
+  document.addEventListener('input',  scheduleAutoSave);
+  document.addEventListener('change', scheduleAutoSave);
+
+  // ========== 初期化 ==========
+  initRemarks();
+  addCalcRow();  // サイズ計算：初期行
+  addRow();      // 見積もり：初期行
+  restoreSectionOrder();   // セクション順を復元
+  initSectionDnD();        // D&D初期化
+  initFormulaInputs();    // フォーミュラ評価初期化
+  // 自動保存の復元
+  const savedAutoSave = localStorage.getItem('autoSaveEnabled');
+  if (savedAutoSave === '1') {
+    autoSaveEnabled = true;
+    const chk = document.getElementById('autoSaveChk');
+    if (chk) chk.checked = true;
+  }
+
+  // ========== トースト通知 ==========
+  function showToast(msg, type = 'info', duration = 2800) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.textContent = msg;
+    container.appendChild(el);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => el.classList.add('visible'));
+    });
+    setTimeout(() => {
+      el.classList.remove('visible');
+      setTimeout(() => el.remove(), 320);
+    }, duration);
+  }
+
+  // ========== コマンドパレット ==========
+  const CMD_LIST = [
+    { icon:'🗂️', label:'管理番号入力セクションへ',  sub:'REF # / 引き合い元 / 担当',     action:() => scrollToSection('section-ref')   },
+    { icon:'🚢', label:'引き合い条件セクションへ',   sub:'作業範囲・ルート・インコタームズ', action:() => scrollToSection('section-cond')  },
+    { icon:'📦', label:'貨物情報・サイズ計算セクションへ', sub:'貨物名・CBM・RT・CW 自動計算', action:() => scrollToSection('section-cargo') },
+    { icon:'💴', label:'見積もり表セクションへ',      sub:'費用行の入力・集計',              action:() => scrollToSection('section-table') },
+    { icon:'📋', label:'特記事項セクションへ',        sub:'フリーテキスト欄',               action:() => scrollToSection('section-free')  },
+    { icon:'📝', label:'条件・リマークセクションへ',  sub:'プリセット文を挿入',             action:() => scrollToSection('section-remark')},
+    { icon:'➕', label:'行を追加',                    sub:'見積もり表に新しい行を末尾に追加', action:() => { addRow(); showToast('✅ 行を追加しました', 'success'); } },
+    { icon:'↕️', label:'カテゴリ順に並び替え',        sub:'カテゴリ種別でソート',            action:() => { sortByCategory(); showToast('✅ ソートしました', 'success'); } },
+    { icon:'👁️', label:'プレビューを開く',            sub:'印刷・コピー用のプレビュー',      action: openPreview },
+    { icon:'💾', label:'データを保存',                sub:'LocalStorage に現在のデータを保存', action:() => saveData(false) },
+    { icon:'📂', label:'データを読み込む',            sub:'保存したデータを復元',            action: loadData },
+    { icon:'📂', label:'プリセット管理',              sub:'よく使う入力パターンの保存・呼び出し', action: openPresetMgr },
+    { icon:'⬇',  label:'CSV ダウンロード',            sub:'見積もり行をCSVファイルとして保存', action: downloadCSV },
+    { icon:'🔀', label:'カテゴリ順にソート',          sub:'カテゴリ種別でテーブルを並び替え', action: sortByCategory },
+    { icon:'🗑️', label:'全行リセット',               sub:'見積もり表の全行を削除してリセット', action: resetAll },
+  ];
+  let _cmdActiveIdx = -1;
+  let _cmdFiltered  = CMD_LIST;
+
+  function openCmdPalette() {
+    const pal = document.getElementById('cmdPalette');
+    pal.classList.add('open');
+    const inp = document.getElementById('cmdInput');
+    inp.value = '';
+    _cmdFiltered = CMD_LIST;
+    _cmdActiveIdx = 0;
+    renderCmdList();
+    setTimeout(() => inp.focus(), 40);
+  }
+
+  function closeCmdPalette() {
+    document.getElementById('cmdPalette').classList.remove('open');
+    _cmdActiveIdx = -1;
+  }
+
+  function filterCmd() {
+    const q = document.getElementById('cmdInput').value.toLowerCase().trim();
+    _cmdFiltered = q
+      ? CMD_LIST.filter(c =>
+          c.label.toLowerCase().includes(q) ||
+          (c.sub || '').toLowerCase().includes(q))
+      : CMD_LIST;
+    _cmdActiveIdx = _cmdFiltered.length ? 0 : -1;
+    renderCmdList();
+  }
+
+  function renderCmdList() {
+    const el = document.getElementById('cmdList');
+    if (!_cmdFiltered.length) {
+      el.innerHTML = '<div class="cmd-empty">コマンドが見つかりません</div>';
+      return;
+    }
+    el.innerHTML = _cmdFiltered.map((c, i) => `
+      <div class="cmd-item${i === _cmdActiveIdx ? ' active' : ''}"
+           onclick="execCmdByFiltered(${i})">
+        <span class="cmd-icon">${c.icon}</span>
+        <div style="flex:1">
+          <div class="cmd-label">${c.label}</div>
+          ${c.sub ? `<div class="cmd-sub">${escHtml(c.sub)}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  function execCmdByFiltered(idx) {
+    if (_cmdFiltered[idx]) {
+      _cmdFiltered[idx].action();
+      closeCmdPalette();
+    }
+  }
+
+  function cmdKeydown(e) {
+    const len = _cmdFiltered.length;
+    if (!len) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _cmdActiveIdx = (_cmdActiveIdx + 1) % len;
+      renderCmdList();
+      document.querySelectorAll('#cmdList .cmd-item')[_cmdActiveIdx]
+        ?.scrollIntoView({ block:'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _cmdActiveIdx = (_cmdActiveIdx - 1 + len) % len;
+      renderCmdList();
+      document.querySelectorAll('#cmdList .cmd-item')[_cmdActiveIdx]
+        ?.scrollIntoView({ block:'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      execCmdByFiltered(_cmdActiveIdx);
+    } else if (e.key === 'Escape') {
+      closeCmdPalette();
+    }
+  }
+
+  function scrollToSection(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    el.scrollIntoView({ behavior:'smooth', block:'start' });
+    const prev = el.style.outline;
+    el.style.transition = 'outline .2s';
+    el.style.outline = '2px solid #3498db';
+    setTimeout(() => { el.style.outline = prev || ''; }, 1400);
+  }
+
+  // ========== フォーミュラ評価（ペースト時に計算式を自動評価） ==========
+  function safeEvalExpr(expr) {
+    try {
+      const clean = String(expr).replace(/[^0-9+\-*/.() ]/g, '').trim();
+      if (!clean || !/[+\-*/]/.test(clean)) return null;
+      // eslint-disable-next-line no-new-func
+      const result = Function('"use strict"; return (' + clean + ')')();
+      return (typeof result === 'number' && isFinite(result)) ? result : null;
+    } catch(e) { return null; }
+  }
+
+  function initFormulaInputs() {
+    document.addEventListener('paste', function(e) {
+      const el = e.target;
+      if (el.type !== 'number') return;
+      if (!el.closest('#tableBody, #calcBody')) return;
+      const text = (e.clipboardData || window.clipboardData).getData('text').trim();
+      const result = safeEvalExpr(text);
+      if (result !== null) {
+        e.preventDefault();
+        el.value = parseFloat(result.toFixed(6));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        showToast('🧮 ' + text + ' = ' + result.toLocaleString('ja-JP', {maximumFractionDigits:4}), 'info');
+      }
+    });
+  }
+
+  // ========== 処理済みマーク ==========
+  function toggleDone(id) {
+    const btn = document.getElementById('done-' + id);
+    const tr  = document.getElementById('row-' + id);
+    if (!btn || !tr) return;
+    const isDone = btn.classList.toggle('done');
+    tr.classList.toggle('row-done', isDone);
+    showToast(isDone ? '✅ 処理済みにしました' : '↩ 未処理に戻しました',
+              isDone ? 'success' : 'info', 1800);
+  }
+
+  // ========== プリセット管理 ==========
+  const PRESET_KEY = 'quotePresets_v1';
+
+  function openPresetMgr() {
+    renderPresetList();
+    document.getElementById('presetMgrModal').classList.add('open');
+    setTimeout(() => document.getElementById('presetNameInput')?.focus(), 50);
+  }
+
+  function closePresetMgr() {
+    document.getElementById('presetMgrModal').classList.remove('open');
+  }
+
+  function getPresets() {
+    try { return JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); }
+    catch(e) { return []; }
+  }
+
+  function savePresetsToStorage(presets) {
+    localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  }
+
+  function savePreset() {
+    const name = document.getElementById('presetNameInput')?.value.trim();
+    if (!name) { showToast('⚠️ プリセット名を入力してください', 'warning'); return; }
+    const presets = getPresets();
+    if (presets.length >= 10) { showToast('⚠️ プリセットは最大10件です', 'warning'); return; }
+    const data = gatherAllData();
+    presets.unshift({ name, data, ts: new Date().toISOString() });
+    savePresetsToStorage(presets);
+    document.getElementById('presetNameInput').value = '';
+    renderPresetList();
+    showToast('💾 「' + name + '」を保存しました', 'success');
+  }
+
+  function loadPreset(idx) {
+    const presets = getPresets();
+    const preset  = presets[idx];
+    if (!preset) return;
+    if (!confirm('「' + preset.name + '」を読み込みますか？\n現在の入力内容は上書きされます。')) return;
+    // フォーム復元
+    Object.entries(preset.data.fields || {}).forEach(([id, v]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = v;
+      else el.value = v;
+    });
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    (preset.data.rows || []).forEach(() => addRow());
+    const trs = document.querySelectorAll('#tableBody tr');
+    (preset.data.rows || []).forEach((cells, i) => {
+      if (!trs[i]) return;
+      trs[i].querySelectorAll('input, select, textarea').forEach((el, j) => {
+        if (cells[j] !== undefined) el.value = cells[j];
+      });
+    });
+    updateTotals();
+    updateIncotermsVisual();
+    updateRouteModeIcon();
+    closePresetMgr();
+    showToast('📂 「' + preset.name + '」を読み込みました', 'success');
+  }
+
+  function deletePreset(idx) {
+    const presets = getPresets();
+    const name    = presets[idx]?.name || '';
+    if (!confirm('「' + name + '」を削除しますか？')) return;
+    presets.splice(idx, 1);
+    savePresetsToStorage(presets);
+    renderPresetList();
+    showToast('🗑️ 「' + name + '」を削除しました', 'info');
+  }
+
+  function renderPresetList() {
+    const presets = getPresets();
+    const wrap    = document.getElementById('presetListWrap');
+    if (!wrap) return;
+    if (!presets.length) {
+      wrap.innerHTML = '<div class="preset-empty">保存済みのプリセットはありません<br><small style="color:#bbb;">上のフォームから保存できます</small></div>';
+      return;
+    }
+    wrap.innerHTML = presets.map((p, i) => {
+      const ts = p.ts
+        ? new Date(p.ts).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+        : '';
+      return '<div class="preset-list-item">' +
+        '<span class="preset-list-name">' + escHtml(p.name) + '</span>' +
+        '<span class="preset-list-ts">'   + ts + '</span>' +
+        '<button class="btn-preset-load" onclick="loadPreset(' + i + ')">読み込む</button>' +
+        '<button class="btn-preset-del"  onclick="deletePreset(' + i + ')" title="削除">✕</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  // ========== ファイル出力・読込 ==========
+
+  function exportToFile() {
+    // 基本データ収集
+    const base = gatherAllData();
+
+    // doneボタン状態を収集（行ID → true/false）
+    const doneStates = {};
+    document.querySelectorAll('#tableBody tr').forEach(tr => {
+      const btn = tr.querySelector('.done-btn');
+      if (btn) {
+        const id = btn.id.replace('done-', '');
+        doneStates[id] = btn.classList.contains('done');
+      }
+    });
+
+    // calc行データを収集（IDがなくクラスのみのため個別取得）
+    const calcRows = [];
+    document.querySelectorAll('#calcBody tr').forEach(tr => {
+      calcRows.push({
+        pcs: tr.querySelector('.calc-pcs')?.value ?? '',
+        l:   tr.querySelector('.calc-l')?.value   ?? '',
+        w:   tr.querySelector('.calc-w')?.value   ?? '',
+        h:   tr.querySelector('.calc-h')?.value   ?? '',
+        kg:  tr.querySelector('.calc-kg')?.value  ?? ''
+      });
+    });
+
+    // ファイル名生成（REF番号または顧客名＋日付）
+    const refEl   = document.querySelector('[id^="ref-"], #refNo, input[placeholder*="REF"], input[placeholder*="ref"]');
+    const custEl  = document.querySelector('[id*="cust"], [id*="customer"], [id*="Customer"]');
+    const refVal  = (refEl?.value  || '').replace(/[^\w\-]/g,'_').slice(0, 20);
+    const custVal = (custEl?.value || '').replace(/[^\w\-぀-ヿ㐀-䶿一-鿿]/g,'_').slice(0, 20);
+    const today   = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const parts   = [refVal, custVal, today].filter(Boolean);
+    const fname   = (parts.length ? parts.join('_') : 'mitsumori_' + today) + '.json';
+
+    const payload = {
+      _version: 1,
+      _app: '見積支援ツール',
+      exportedAt: new Date().toISOString(),
+      fields: base.fields,
+      rows: base.rows,
+      doneStates,
+      calcRows
+    };
+
+    // ダウンロード
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = fname;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📤 ファイルを出力しました: ' + fname, 'success');
+  }
+
+  function importFromFile(event) {
+    const file = event.target.files[0];
+    event.target.value = ''; // 同じファイルの再選択を可能にする
+    if (!file) return;
+    if (!file.name.endsWith('.json')) {
+      showToast('⚠️ .json ファイルを選択してください', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      let data;
+      try { data = JSON.parse(e.target.result); }
+      catch(err) { alert('ファイルの読み込みに失敗しました。\n' + err.message); return; }
+
+      if (!data._version || data._app !== '見積支援ツール') {
+        if (!confirm('このファイルは見積支援ツール以外から作成された可能性があります。\n続行しますか？')) return;
+      }
+
+      const exportedAt = data.exportedAt
+        ? new Date(data.exportedAt).toLocaleString('ja-JP')
+        : '不明';
+      if (!confirm('出力日時: ' + exportedAt + '\n\n現在のデータを上書きして読み込みますか？')) return;
+
+      // ---- フォーム復元 ----
+      Object.entries(data.fields || {}).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === 'checkbox') el.checked = val;
+        else el.value = val;
+      });
+
+      // ---- 見積テーブル行復元 ----
+      document.getElementById('tableBody').innerHTML = '';
+      rowCount = 0;
+      (data.rows || []).forEach(() => addRow());
+      const trs = document.querySelectorAll('#tableBody tr');
+      (data.rows || []).forEach((cells, i) => {
+        if (!trs[i]) return;
+        trs[i].querySelectorAll('input, select, textarea').forEach((el, j) => {
+          if (cells[j] !== undefined) el.value = cells[j];
+        });
+      });
+
+      // ---- doneボタン状態復元 ----
+      Object.entries(data.doneStates || {}).forEach(([rowId, isDone]) => {
+        const btn = document.getElementById('done-' + rowId);
+        if (!btn) return;
+        if (isDone) {
+          btn.classList.add('done');
+          btn.closest('tr')?.classList.add('row-done');
+        } else {
+          btn.classList.remove('done');
+          btn.closest('tr')?.classList.remove('row-done');
+        }
+      });
+
+      // ---- calc行復元 ----
+      document.getElementById('calcBody').innerHTML = '';
+      calcRowCount = 0;
+      (data.calcRows || []).forEach(row => {
+        addCalcRow();
+        const tr = document.getElementById('calcBody').lastElementChild;
+        if (!tr) return;
+        if (row.pcs !== '') tr.querySelector('.calc-pcs').value = row.pcs;
+        if (row.l   !== '') tr.querySelector('.calc-l').value   = row.l;
+        if (row.w   !== '') tr.querySelector('.calc-w').value   = row.w;
+        if (row.h   !== '') tr.querySelector('.calc-h').value   = row.h;
+        if (row.kg  !== '') tr.querySelector('.calc-kg').value  = row.kg;
+      });
+
+      // ---- UI更新 ----
+      updateTotals();
+      calcLiveUpdate();
+      updateIncotermsVisual();
+      updateRouteModeIcon();
+      showToast('📥 ファイルを読み込みました', 'success');
+      showSaveStatus('📥 ファイル読込完了');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  // ========== スコーププリセット ダイアログ ==========
+
+  function openScopePresetDlg(scope) {
+    _presetPendingScope = scope;
+    const presets = SCOPE_PRESETS[scope] || [];
+    const scopeLabels = {
+      domestic: '🏠 国内のみ',
+      export:   '📤 輸出',
+      import:   '📥 輸入',
+      dtd:      '🌐 Door to Door',
+    };
+    const title = document.getElementById('scopePresetTitle');
+    if (title) title.textContent = '📋 ' + (scopeLabels[scope] || scope) + ' — プリセットを挿入しますか？';
+
+    // プリセット内容リストを生成
+    const itemsEl = document.getElementById('scopePresetItems');
+    if (itemsEl) {
+      itemsEl.innerHTML = presets.map((p, i) =>
+        (i + 1) + '. ' + (CATEGORIES.find(c => c.value === p.cat)?.label || p.cat) + ' ／ ' + p.name +
+        (p.note ? ' (' + p.note + ')' : '')
+      ).join('<br>');
+    }
+
+    const modal = document.getElementById('scopePresetModal');
+    if (modal) modal.classList.add('open');
+  }
+
+  function closeScopePresetDlg() {
+    const modal = document.getElementById('scopePresetModal');
+    if (modal) modal.classList.remove('open');
+    _presetPendingScope = '';
+  }
+
+  function applyScopePreset(mode) {
+    const scope = _presetPendingScope;
+    const presets = SCOPE_PRESETS[scope];
+    closeScopePresetDlg();
+    if (!presets || presets.length === 0) return;
+
+    if (mode === 'replace') {
+      // テーブルをクリアして置換
+      document.getElementById('tableBody').innerHTML = '';
+      rowCount = 0;
+    }
+
+    // 最後の行の通貨を引き継ぐ（追加モード時）
+    let lastCur = 'JPY';
+    const lastSelect = document.querySelector('#tableBody tr:last-child [id^="pc-"]');
+    if (lastSelect) lastCur = lastSelect.value || 'JPY';
+
+    presets.forEach(item => {
+      rowCount++;
+      const id = rowCount;
+      const tbody = document.getElementById('tableBody');
+      const tr = document.createElement('tr');
+      tr.id = 'row-' + id;
+      tr.innerHTML = buildRowHTML(id, item.cat, lastCur);
+      tbody.appendChild(tr);
+
+      // 品名・備考を設定
+      const nmEl = document.getElementById('nm-' + id);
+      if (nmEl) nmEl.value = item.name;
+      const ntEl = document.getElementById('nt-' + id);
+      if (ntEl) ntEl.value = item.note || '';
+
+      // カテゴリ変更・計算を初期化
+      if (typeof onCatChange === 'function') onCatChange(id);
+      if (typeof onPay     === 'function') onPay(id);
+      if (typeof initDrag  === 'function') initDrag(tr);
+    });
+
+    updateTotals();
+    const modeLabel = mode === 'replace' ? '置換' : '追加';
+    showToast('✅ プリセット' + modeLabel + '完了（' + presets.length + '行）', 'success');
+  }
+
+  // ========== 方向・輸送モード プライマリセレクター ==========
+
+  // 現在の選択状態を保持
+  let _currentDirection = '';  // 'export' | 'import' | ''
+  let _currentTransport = '';  // 'sea' | 'air' | ''
+  let _currentSeaSub    = 'fcl'; // 'fcl' | 'lcl'
+
+  // ---- スコープ拡張オプション状態 ----
+  let _pickupFromOrigin = false; // 🚚 集荷から手配
+  let _deliverToDest    = false; // 🏠 納入まで手配
+  let _packingService   = false; // 📦 梱包手配あり
+  let _customsExport    = false; // 🛃 輸出通関
+  let _customsImport    = false; // 🛃 輸入通関
+
+  /**
+   * スコープ拡張トグル
+   * @param {'pickup'|'deliver'|'packing'} opt
+   */
+  function toggleScopeOpt(opt) {
+    if (opt === 'pickup')   _pickupFromOrigin = !_pickupFromOrigin;
+    if (opt === 'deliver')  _deliverToDest    = !_deliverToDest;
+    if (opt === 'packing')  _packingService   = !_packingService;
+    if (opt === 'customsE') _customsExport    = !_customsExport;
+    if (opt === 'customsI') _customsImport    = !_customsImport;
+
+    // ボタン状態更新
+    document.getElementById('optPickupBtn')  ?.classList.toggle('active', _pickupFromOrigin);
+    document.getElementById('optDeliverBtn') ?.classList.toggle('active', _deliverToDest);
+    document.getElementById('optPackingBtn') ?.classList.toggle('active', _packingService);
+    document.getElementById('optCustomsEBtn')?.classList.toggle('active', _customsExport);
+    document.getElementById('optCustomsIBtn')?.classList.toggle('active', _customsImport);
+
+    // 梱包ノード・コネクター表示切替
+    document.getElementById('conn-origin-packing')?.classList.toggle('opt-hidden', !_packingService);
+    document.getElementById('rn-packing')          ?.classList.toggle('opt-hidden', !_packingService);
+    document.getElementById('conn-packing-pol')    ?.classList.toggle('opt-hidden', !_packingService);
+
+    // 集荷地ノードの「オプション」スタイル（輸入時に集荷を追加したとき）
+    const rnOrigin = document.getElementById('rn-origin');
+    if (rnOrigin) {
+      const isImportExtend = _currentDirection === 'import' && _pickupFromOrigin;
+      rnOrigin.classList.toggle('rn-opt-extended', isImportExtend);
+    }
+
+    // 納入地ノードの「オプション」スタイル（輸出時に納入を追加したとき）
+    const rnDest = document.getElementById('rn-dest');
+    if (rnDest) {
+      const isExportExtend = _currentDirection === 'export' && _deliverToDest;
+      rnDest.classList.toggle('rn-opt-extended', isExportExtend);
+    }
+
+    // スコープ可視性を再適用
+    const scope = { export: 'export', import: 'import' }[_currentDirection] || 'all';
+    _applyScopeVisibility(scope);
+    updateRouteConnectors(scope);
+    // _applyAllOptConnectors は updateRouteConnectors 末尾で自動呼び出し済み
+  }
+
+  /** 輸出/輸入トグル */
+  function setDirection(dir) {
+    _currentDirection = dir;
+    // ボタン状態更新
+    document.querySelectorAll('#dirBtns .cond-prim-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.dir === dir)
+    );
+    // 全マイルストーンを表示してリセット（ユーザーが不要なものを✕で消す方式）
+    _showAllMilestones();
+    updateIncotermsVisual();
+  }
+
+  /** Sea / Air プライマリトグル */
+  function setTransport(transport) {
+    _currentTransport = transport;
+    document.querySelectorAll('#seaAirBtns .cond-prim-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.transport === transport)
+    );
+    // FCL/LCL サブボタン表示切替
+    const fclLcl = document.getElementById('fclLclBtns');
+    if (fclLcl) fclLcl.style.display = transport === 'sea' ? '' : 'none';
+    // Air のとき海上専用インコタームズ選択肢をグレーアウト（disabled）
+    const seaGroup = document.getElementById('inco-sea-group');
+    if (seaGroup) seaGroup.disabled = transport === 'air';
+    // cond-mode select を同期して updateRouteModeIcon を呼ぶ
+    _syncModeSelect();
+    updateRouteModeIcon();
+  }
+
+  /** FCL / LCL サブトグル（Seaのとき表示） */
+  function setSeaSub(sub) {
+    _currentSeaSub = sub;
+    document.querySelectorAll('#fclLclBtns .cond-sub-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.sub === sub)
+    );
+    _syncModeSelect();
+    updateRouteModeIcon();
+  }
+
+  /** ボタン状態を内部 cond-mode select に同期 */
+  function _syncModeSelect() {
+    const sel = document.getElementById('cond-mode');
+    if (!sel) return;
+    if (_currentTransport === 'sea') {
+      sel.value = _currentSeaSub === 'lcl' ? '海上（LCL）' : '海上（FCL）';
+    } else if (_currentTransport === 'air') {
+      sel.value = '航空（AIR）';
+    } else {
+      sel.value = '';
+    }
+  }
+
+  // ---- プログラム用セッター（applyIncoMilestonePreset から呼ぶ） ----
+  function _setPickup(on) {
+    _pickupFromOrigin = !!on;
+    document.getElementById('optPickupBtn')?.classList.toggle('active', _pickupFromOrigin);
+    const el = document.getElementById('rn-origin');
+    if (el) el.classList.toggle('rn-opt-extended', _currentDirection === 'import' && _pickupFromOrigin);
+  }
+  function _setDeliver(on) {
+    _deliverToDest = !!on;
+    document.getElementById('optDeliverBtn')?.classList.toggle('active', _deliverToDest);
+    const el = document.getElementById('rn-dest');
+    if (el) el.classList.toggle('rn-opt-extended', _currentDirection === 'export' && _deliverToDest);
+  }
+  function _setPacking(on) {
+    _packingService = !!on;
+    document.getElementById('optPackingBtn')?.classList.toggle('active', _packingService);
+    document.getElementById('conn-origin-packing')?.classList.toggle('opt-hidden', !_packingService);
+    document.getElementById('rn-packing')          ?.classList.toggle('opt-hidden', !_packingService);
+    document.getElementById('conn-packing-pol')    ?.classList.toggle('opt-hidden', !_packingService);
+  }
+  function _setCustomsExport(on) {
+    _customsExport = !!on;
+    document.getElementById('optCustomsEBtn')?.classList.toggle('active', _customsExport);
+  }
+  function _setCustomsImport(on) {
+    _customsImport = !!on;
+    document.getElementById('optCustomsIBtn')?.classList.toggle('active', _customsImport);
+  }
+  function _setWarehouse(on) {
+    on = !!on;
+    if (warehouseOn === on) return;
+    warehouseOn = on;
+    const btn  = document.getElementById('whToggleBtn');
+    const desc = document.getElementById('whToggleDesc');
+    btn?.classList.toggle('active', warehouseOn);
+    if (desc) desc.textContent = warehouseOn ? '倉庫ノードをルートに追加中' : '';
+  }
+
+  /**
+   * インコタームズコードと方向からマイルストーンオプションを自動設定する。
+   * onIncotermsChange() から呼ばれる。
+   */
+  function applyIncoMilestonePreset(code) {
+    const dir = _currentDirection;
+    if (!dir || !code) return;
+    const presets = INCO_MILESTONE_PRESETS[code];
+    if (!presets) return;
+    const p = presets[dir];
+    if (!p) return;
+
+    // 各オプションを設定
+    _setPickup(p.pickup);
+    _setDeliver(p.deliver);
+    _setWarehouse(p.warehouse);
+    _setCustomsExport(p.customsE);
+    _setCustomsImport(p.customsI);
+
+    // スコープ可視性を再適用（pickup/deliver による origin/dest 強制表示）
+    const scope = { export: 'export', import: 'import' }[dir] || 'all';
+    _applyScopeVisibility(scope);
+    updateRouteConnectors(scope);
+    // _applyAllOptConnectors は updateRouteConnectors 末尾で呼ばれる
+
+    showToast('✅ ' + code + '（' + (dir === 'export' ? '輸出' : '輸入') + '）マイルストーン適用', 'success');
+  }
+
+  /**
+   * 方向選択時に全マイルストーンノードを表示する。
+   * ユーザーが✕ボタンで不要なノードを削除する方式の初期状態。
+   */
+  function _showAllMilestones() {
+    _setPickup(true);        // origin を常に表示
+    _setDeliver(true);       // dest を常に表示
+    _setPacking(true);       // 梱包ノード表示（opt-hidden 解除）
+    _setWarehouse(true);     // 倉庫ノード表示
+    _setCustomsExport(true); // 輸出通関ノード表示
+    _setCustomsImport(true); // 輸入通関ノード表示
+    // スコープ可視性を再計算（pickup/deliver が true なので全ノード表示）
+    const scope = { export: 'export', import: 'import' }[_currentDirection] || 'all';
+    _applyScopeVisibility(scope);
+    updateRouteConnectors(scope);
+    // opt-extended は全表示モードでは不要
+    document.getElementById('rn-origin')?.classList.remove('rn-opt-extended');
+    document.getElementById('rn-dest')?.classList.remove('rn-opt-extended');
+  }
+
+  /**
+   * ✕ボタンから呼ばれる: 指定ノードを非表示にしてインコタームズを逆推定する。
+   * @param {string} nodeId  非表示にするノードのID
+   */
+  function hideNode(nodeId) {
+    switch (nodeId) {
+      case 'rn-packing':   _setPacking(false);       break;
+      case 'rn-wh-origin':
+      case 'rn-wh-dest':   _setWarehouse(false);     break;
+      case 'rn-customs-e': _setCustomsExport(false); break;
+      case 'rn-customs-i': _setCustomsImport(false); break;
+      default: return;
+    }
+    const scope = { export: 'export', import: 'import' }[_currentDirection] || 'all';
+    _applyScopeVisibility(scope);
+    updateRouteConnectors(scope);
+    // インコタームズを逆推定
+    _inferIncotermsFromMilestones();
+  }
+
+  /**
+   * 現在のマイルストーン状態からインコタームズを逆推定し、
+   * セレクトボックスに自動反映する（ゾーン色も更新）。
+   */
+  function _inferIncotermsFromMilestones() {
+    const dir = _currentDirection;
+    if (!dir) return;
+    const current = {
+      pickup:    _pickupFromOrigin,
+      deliver:   _deliverToDest,
+      warehouse: warehouseOn,
+      customsE:  _customsExport,
+      customsI:  _customsImport,
+    };
+    let bestCode = null, bestScore = -1;
+    for (const [code, dirs] of Object.entries(INCO_MILESTONE_PRESETS)) {
+      const p = dirs[dir];
+      if (!p) continue;
+      let score = 0;
+      if (p.pickup    === current.pickup)    score++;
+      if (p.deliver   === current.deliver)   score++;
+      if (p.warehouse === current.warehouse) score++;
+      if (p.customsE  === current.customsE)  score++;
+      if (p.customsI  === current.customsI)  score++;
+      if (score > bestScore) { bestScore = score; bestCode = code; }
+    }
+    if (!bestCode) return;
+    const sel = document.getElementById('cond-incoterms');
+    if (!sel) return;
+    // セレクトの選択肢から3文字コードが一致するものを探す
+    for (const opt of sel.options) {
+      if (opt.value.replace(/[^A-Z]/g, '').slice(0, 3) === bestCode) {
+        if (sel.value !== opt.value) {
+          sel.value = opt.value;
+          updateIncotermsVisual(); // ゾーン色を更新
+          showToast('🔖 インコタームズを推定: ' + bestCode, 'info');
+        }
+        break;
+      }
+    }
+  }
+
+  /**
+   * 梱包・通関オプションに応じてコネクターを調整する。
+   * updateRouteConnectors() 末尾から自動呼び出し。
+   */
+  function _applyAllOptConnectors() {
+    // 0. 梱包ON + 倉庫ON の組み合わせ時、conn-direct を非表示（二重コネクター防止）
+    const connDirectEl = document.getElementById('conn-direct');
+    if (connDirectEl) {
+      if (_packingService && warehouseOn) {
+        connDirectEl.style.setProperty('display', 'none', 'important');
+      } else {
+        connDirectEl.style.removeProperty('display');
+      }
+    }
+    // 1. 梱包バイパス: 梱包ありのとき conn-origin-pol を強制非表示
+    const connOriginPol = document.getElementById('conn-origin-pol');
+    if (connOriginPol) {
+      if (_packingService) {
+        connOriginPol.style.setProperty('display', 'none', 'important');
+      } else {
+        connOriginPol.style.removeProperty('display');
+      }
+    }
+    // 2. 輸出通関ノード表示制御
+    document.getElementById('rn-customs-e')      ?.classList.toggle('opt-hidden', !_customsExport);
+    document.getElementById('conn-customs-e-pol') ?.classList.toggle('opt-hidden', !_customsExport);
+    // 3. 輸入通関ノード表示制御
+    document.getElementById('conn-pod-customs-i') ?.classList.toggle('opt-hidden', !_customsImport);
+    document.getElementById('rn-customs-i')        ?.classList.toggle('opt-hidden', !_customsImport);
+  }
+
+  /** scope に応じたフィールド表示制御（スコープ拡張オプション対応） */
+  function _applyScopeVisibility(scope) {
+    const hideKeys = new Set(SCOPE_CONFIG[scope]?.hide ?? []);
+
+    // スコープ拡張オプションによる強制表示
+    if (_pickupFromOrigin) hideKeys.delete('origin');
+    if (_deliverToDest)   hideKeys.delete('dest');
+
+    document.querySelectorAll('[data-scope-key]').forEach(el => {
+      el.classList.toggle('scope-hidden', hideKeys.has(el.dataset.scopeKey));
+    });
+    document.querySelectorAll('[data-section-fields]').forEach(label => {
+      const fields = label.dataset.sectionFields.split(',');
+      const anyVisible = fields.some(k => {
+        const el = document.querySelector('[data-scope-key="' + k + '"]');
+        return el && !el.classList.contains('scope-hidden');
+      });
+      label.classList.toggle('scope-hidden', !anyVisible);
+      const prev = label.previousElementSibling;
+      if (prev && prev.tagName === 'HR') prev.classList.toggle('scope-hidden', !anyVisible);
+    });
+
+    // opt-extended スタイルの更新
+    const rnOrigin = document.getElementById('rn-origin');
+    if (rnOrigin) {
+      rnOrigin.classList.toggle('rn-opt-extended',
+        _currentDirection === 'import' && _pickupFromOrigin);
+    }
+    const rnDest = document.getElementById('rn-dest');
+    if (rnDest) {
+      rnDest.classList.toggle('rn-opt-extended',
+        _currentDirection === 'export' && _deliverToDest);
+    }
+  }
+
+  // ========== キーボードショートカット ==========
+  document.addEventListener('keydown', function(e) {
+    // Ctrl+K / Cmd+K → コマンドパレット
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      const pal = document.getElementById('cmdPalette');
+      pal.classList.contains('open') ? closeCmdPalette() : openCmdPalette();
+    }
+    // Escape → 開いているモーダルをすべて閉じる
+    if (e.key === 'Escape') {
+      if (document.getElementById('cmdPalette')?.classList.contains('open'))     closeCmdPalette();
+      if (document.getElementById('presetMgrModal')?.classList.contains('open')) closePresetMgr();
+      if (document.getElementById('previewOverlay')?.classList.contains('open')) closePreview();
+      if (document.getElementById('fbOverlay')?.style.display === 'flex')        closeFeedback();
+    }
+  });
+
+</script>
+
+</body>
+</html>

@@ -86,29 +86,10 @@
     ).join('');
   }
 
-  function getUserCategories() {
-    try { return JSON.parse(localStorage.getItem('userCategories_v1') || '[]'); }
-    catch(e) { return []; }
-  }
-  function saveUserCategories(cats) {
-    localStorage.setItem('userCategories_v1', JSON.stringify(cats));
-  }
-  function getAllCategories() {
-    return [...CATEGORIES, ...getUserCategories()];
-  }
-
   function catOpts(sel) {
-    const userCats = getUserCategories();
-    let html = CATEGORIES.map(c =>
+    return CATEGORIES.map(c =>
       `<option value="${c.value}"${c.value === sel ? ' selected' : ''}>${c.label}</option>`
     ).join('');
-    if (userCats.length) {
-      html += `<option value="" disabled>──────────</option>`;
-      html += userCats.map(c =>
-        `<option value="${c.value}"${c.value === sel ? ' selected' : ''}>${c.label}</option>`
-      ).join('');
-    }
-    return html;
   }
 
   function unitOpts(sel) {
@@ -143,52 +124,16 @@ const DEFAULT_FX_RATES = {
 
 // ユーザーが上書きしたレート（localStorageから復元）
 let _fxRates = { ...DEFAULT_FX_RATES };
-// 自動取得モード（true=起動時にAPIから取得、false=手動）
-let _fxAutoMode = false;
 
 function loadFxRates() {
   try {
     const saved = JSON.parse(localStorage.getItem('fxRates_v1') || '{}');
     _fxRates = { ...DEFAULT_FX_RATES, ...saved };
   } catch(e) { _fxRates = { ...DEFAULT_FX_RATES }; }
-  try {
-    _fxAutoMode = localStorage.getItem('fxAutoMode_v1') === '1';
-  } catch(e) { _fxAutoMode = false; }
 }
 
 function saveFxRates() {
   localStorage.setItem('fxRates_v1', JSON.stringify(_fxRates));
-}
-
-function setFxAutoMode(on) {
-  _fxAutoMode = !!on;
-  localStorage.setItem('fxAutoMode_v1', on ? '1' : '0');
-}
-
-/**
- * open.er-api.com から JPYベースのレートを取得して _fxRates を更新する。
- * 取得できなかった通貨は DEFAULT_FX_RATES のままにする。
- */
-async function fetchAutoFxRates() {
-  try {
-    const res = await fetch('https://open.er-api.com/v6/latest/JPY');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    if (json.result !== 'success') throw new Error('API error');
-    const rates = json.rates; // 1 JPY = X 外貨
-    const nonJpy = CURRENCIES.filter(c => c !== 'JPY');
-    nonJpy.forEach(cur => {
-      if (rates[cur] && rates[cur] > 0) {
-        _fxRates[cur] = parseFloat((1 / rates[cur]).toFixed(6)); // 1 外貨 = X JPY
-      }
-    });
-    saveFxRates();
-    localStorage.setItem('fxLastFetched_v1', new Date().toISOString());
-    return true;
-  } catch(e) {
-    console.warn('為替レート取得失敗:', e);
-    return false;
-  }
 }
 
 /** 金額を JPY に換算（cur が JPY なら そのまま） */

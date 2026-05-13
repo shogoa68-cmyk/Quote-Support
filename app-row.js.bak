@@ -7,7 +7,7 @@
     // cat-* クラスを全削除
     tr.className = tr.className.split(' ').filter(c => !c.startsWith('cat-')).join(' ').trim();
     if (cat) {
-      const catObj = getAllCategories().find(c => c.value === cat);
+      const catObj = CATEGORIES.find(c => c.value === cat);
       if (catObj?.cls) tr.classList.add(catObj.cls);
     }
   }

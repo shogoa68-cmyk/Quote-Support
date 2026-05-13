@@ -338,15 +338,9 @@ tbody tr:not([class*="cat-"]):hover td.profit-neg { background-color: #f5cece; }
 
 .condition-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px 20px;
   margin-bottom: 16px;
-}
-@media (max-width: 900px) {
-  .condition-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 560px) {
-  .condition-grid { grid-template-columns: 1fr; }
 }
 .cond-field { display: flex; flex-direction: column; gap: 5px; }
 .cond-field label {
@@ -1989,7 +1983,7 @@ tr.row-done td  { opacity: 0.52; }
   .save-btn     { padding: 4px 9px; font-size: 11px; }
   h1            { font-size: 15px; }
   .container    { padding: 10px; overflow-x: auto; }
-  .condition-grid { grid-template-columns: 1fr; }
+  .condition-grid { grid-template-columns: 1fr 1fr; }
   .scope-btns   { gap: 5px; }
   .scope-btn    { padding: 5px 10px; font-size: 11px; }
   #previewBox   { padding: 16px 14px; }
@@ -2055,135 +2049,3 @@ tr.row-done td  { opacity: 0.52; }
   text-align: right;
 }
 .fx-rate-unit { color: #888; }
-
-/* ========== 為替レートパネル拡張 ==========*/
-.fx-mode-bar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 0 4px; font-size: 12px; color: #555;
-  flex-wrap: wrap;
-}
-.fx-mode-label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-.fx-fetch-btn {
-  background: #2980b9; color: #fff; border: none;
-  padding: 3px 9px; border-radius: 4px; font-size: 11px;
-  cursor: pointer; font-family: inherit;
-}
-.fx-fetch-btn:hover { background: #1f6fa8; }
-.fx-fetch-btn:disabled { background: #aaa; cursor: default; }
-.fx-last-fetched { color: #aaa; font-size: 11px; }
-
-/* ========== チェックボックス列 ========== */
-td.check-cell {
-  width: 22px;
-  background: #f4f6f8;
-  padding: 2px;
-  text-align: center;
-  vertical-align: middle;
-}
-tr:hover td.check-cell { background: #d6eaf8; }
-
-/* ========== ボタングループ ========== */
-.table-btn-group {
-  display: flex; flex-direction: column; gap: 6px;
-  margin: 10px 0;
-}
-.btn-group-row {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-}
-.btn-group-label {
-  font-size: 10px; color: #888; font-weight: 600;
-  text-transform: uppercase; letter-spacing: .04em;
-  padding: 2px 5px; background: #eee; border-radius: 3px;
-  white-space: nowrap;
-}
-
-/* 選択行削除ボタン */
-.btn-bulk-delete {
-  background: #e74c3c; color: #fff; border: none;
-  padding: 5px 12px; border-radius: 4px;
-  font-size: 12px; cursor: pointer; font-family: inherit;
-}
-.btn-bulk-delete:hover { background: #c0392b; }
-
-/* ========== カスタムカテゴリパネル ========== */
-#userCatPanel {
-  display: inline-block; vertical-align: top;
-  margin: 6px 0;
-}
-#userCatDetails {
-  font-size: 12px; cursor: pointer;
-  border: 1px solid #ddd; border-radius: 4px;
-  padding: 0;
-}
-#userCatDetails summary {
-  padding: 5px 10px; background: #f8f9fa;
-  border-radius: 4px; user-select: none;
-  font-weight: 600; color: #555;
-}
-#userCatDetails[open] summary { border-radius: 4px 4px 0 0; }
-#userCatDetails > *:not(summary) {
-  padding: 8px 10px;
-  background: #fff; border-top: 1px solid #eee;
-  border-radius: 0 0 4px 4px;
-}
-.user-cat-list {
-  display: flex; flex-wrap: wrap; gap: 5px;
-  min-height: 22px; margin-bottom: 6px;
-}
-.user-cat-chip {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px 6px; border-radius: 10px;
-  font-size: 11px; font-weight: 600;
-  background: #eee; border: 1px solid #ccc;
-}
-.user-cat-del {
-  background: none; border: none; cursor: pointer;
-  font-size: 10px; color: #999; padding: 0 1px;
-  line-height: 1;
-}
-.user-cat-del:hover { color: #e74c3c; }
-.user-cat-add-row {
-  display: flex; gap: 5px; align-items: center; margin-top: 4px;
-}
-.user-cat-input {
-  flex: 1; padding: 4px 7px; border: 1px solid #ccc;
-  border-radius: 4px; font-size: 12px; font-family: inherit;
-  min-width: 0;
-}
-.user-cat-add-btn {
-  background: #27ae60; color: #fff; border: none;
-  padding: 4px 10px; border-radius: 4px;
-  font-size: 12px; cursor: pointer; font-family: inherit;
-  white-space: nowrap;
-}
-.user-cat-add-btn:hover { background: #1e8449; }
-
-/* ユーザーカテゴリ 5色 */
-.cat-user-a { background: #fde8d8 !important; border-left: 3px solid #e67e22 !important; }
-.cat-user-b { background: #d5e8d4 !important; border-left: 3px solid #27ae60 !important; }
-.cat-user-c { background: #dae8fc !important; border-left: 3px solid #2980b9 !important; }
-.cat-user-d { background: #e8d5f5 !important; border-left: 3px solid #8e44ad !important; }
-.cat-user-e { background: #fef9e7 !important; border-left: 3px solid #f39c12 !important; }
-/* chip色も同じ配色 */
-.user-cat-chip.cat-user-a { background: #fde8d8; border-color: #e67e22; }
-.user-cat-chip.cat-user-b { background: #d5e8d4; border-color: #27ae60; }
-.user-cat-chip.cat-user-c { background: #dae8fc; border-color: #2980b9; }
-.user-cat-chip.cat-user-d { background: #e8d5f5; border-color: #8e44ad; }
-.user-cat-chip.cat-user-e { background: #fef9e7; border-color: #f39c12; }
-
-/* ========== 貨物情報フィールド並び替え ========== */
-.cond-sort-handle {
-  display: inline-block;
-  cursor: grab;
-  color: #bbb;
-  font-size: 12px;
-  margin-right: 2px;
-  user-select: none;
-  padding: 0 2px;
-  line-height: 1;
-  vertical-align: middle;
-}
-.cond-sort-handle:hover { color: #2980b9; }
-.cond-field[draggable="true"] { transition: box-shadow .12s, opacity .12s; }
-.cond-field-dragging { opacity: .45; box-shadow: 0 0 0 2px #2980b9; border-radius: 5px; }
-.cond-field-over { box-shadow: -3px 0 0 #2980b9; border-radius: 3px; }

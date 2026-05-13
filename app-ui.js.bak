@@ -151,19 +151,7 @@
   // ========== 為替レートパネル ==========
   function renderFxPanel() {
     const grid = document.getElementById('fxRateGrid');
-    if (!grid) return;
-    // 自動/手動モードのトグルを更新
-    const autoChk = document.getElementById('fxAutoModeChk');
-    if (autoChk) autoChk.checked = _fxAutoMode;
-    // 最終取得日時を更新
-    const lastFetched = localStorage.getItem('fxLastFetched_v1');
-    const lastEl = document.getElementById('fxLastFetched');
-    if (lastEl) {
-      lastEl.textContent = lastFetched
-        ? '最終取得: ' + new Date(lastFetched).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
-        : '未取得（デフォルト値）';
-    }
-    // レート入力グリッドを再描画
+    if (!grid || grid.dataset.rendered === '1') return;
     const nonJpy = CURRENCIES.filter(c => c !== 'JPY');
     grid.innerHTML = nonJpy.map(cur => `
       <div class="fx-rate-item">
@@ -174,6 +162,7 @@
                oninput="updateFxRate('${cur}', this.value)" />
         <span class="fx-rate-unit">JPY</span>
       </div>`).join('');
+    grid.dataset.rendered = '1';
   }
 
   function updateFxRate(cur, val) {
@@ -182,81 +171,8 @@
       _fxRates[cur] = v;
       saveFxRates();
       updateTotals();
-      // 通知なし（FBにより削除）
+      showToast(`💱 ${cur} = ${v} JPY に設定しました`, 'info', 2000);
     }
-  }
-
-  async function doFetchFxRates() {
-    const btn = document.getElementById('fxFetchBtn');
-    if (btn) { btn.disabled = true; btn.textContent = '取得中…'; }
-    const ok = await fetchAutoFxRates();
-    renderFxPanel();
-    updateTotals();
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 今すぐ取得'; }
-    showToast(ok ? '✅ 為替レートを更新しました' : '⚠️ 取得失敗。デフォルト値を使用します', ok ? 'success' : 'warn', 3000);
-  }
-
-  function onFxAutoModeChange(checked) {
-    setFxAutoMode(checked);
-    if (checked) {
-      doFetchFxRates();
-    }
-  }
-
-  // ========== カスタムカテゴリ管理 ==========
-  // カテゴリ色セット（5色ローテーション）
-  const USER_CAT_CLASSES = ['cat-user-a','cat-user-b','cat-user-c','cat-user-d','cat-user-e'];
-
-  function renderUserCatPanel() {
-    const cats = getUserCategories();
-    const list = document.getElementById('userCatList');
-    if (!list) return;
-    if (!cats.length) {
-      list.innerHTML = '<span style="color:#aaa;font-size:12px;">カスタムカテゴリなし</span>';
-      return;
-    }
-    list.innerHTML = cats.map(c =>
-      `<span class="user-cat-chip ${c.cls || ''}">${escHtml(c.label)}
-         <button class="user-cat-del" onclick="doDeleteUserCat('${c.value}')" title="削除">✕</button>
-       </span>`
-    ).join('');
-  }
-
-  function doAddUserCat() {
-    const input = document.getElementById('newCatInput');
-    const label = input?.value.trim();
-    if (!label) { showToast('⚠️ カテゴリ名を入力してください', 'warn'); return; }
-    const cats = getUserCategories();
-    if (cats.some(c => c.label === label)) { showToast('⚠️ 同名のカテゴリが既にあります', 'warn'); return; }
-    const cls = USER_CAT_CLASSES[cats.length % USER_CAT_CLASSES.length];
-    const value = 'user-' + Date.now();
-    cats.push({ value, label, cls });
-    saveUserCategories(cats);
-    if (input) input.value = '';
-    renderUserCatPanel();
-    refreshAllCategoryDropdowns();
-    showToast(`✅ カテゴリ「${label}」を追加しました`, 'success');
-  }
-
-  function doDeleteUserCat(value) {
-    const cats = getUserCategories();
-    const cat = cats.find(c => c.value === value);
-    if (!cat) return;
-    if (!confirm(`「${cat.label}」を削除しますか？\n（このカテゴリが設定されている行は「未設定」になります）`)) return;
-    saveUserCategories(cats.filter(c => c.value !== value));
-    renderUserCatPanel();
-    refreshAllCategoryDropdowns();
-    showToast(`🗑️ 「${cat.label}」を削除しました`, 'info');
-  }
-
-  function refreshAllCategoryDropdowns() {
-    document.querySelectorAll('#tableBody tr').forEach(tr => {
-      const id = tr.id.replace('row-', '');
-      const sel = document.getElementById(`cat-${id}`);
-      if (!sel) return;
-      const curVal = sel.value;
-      sel.innerHTML = catOpts(curVal);
-    });
   }
 
   // ========== 一括コピー機能 ==========
@@ -299,34 +215,8 @@
     });
     // 元行のチェックも外す
     checkboxes.forEach(chk => { chk.checked = false; });
-    // ヘッダーの全選択チェックをリセット
-    const allChk = document.getElementById('selectAllChk');
-    if (allChk) allChk.checked = false;
     updateTotals();
     showToast(`📋 ${srcRows.length}行をコピーしました`, 'success');
-  }
-
-  // ========== 選択行削除 ==========
-  function deleteSelectedRows() {
-    const checkboxes = document.querySelectorAll('.row-select-chk:checked');
-    if (!checkboxes.length) {
-      showToast('⚠️ 削除したい行のチェックボックスにチェックを入れてください', 'warn', 3000);
-      return;
-    }
-    const rows = Array.from(checkboxes).map(chk => chk.closest('tr')).filter(Boolean);
-    if (!confirm(`チェックした ${rows.length} 行を削除しますか？`)) return;
-    rows.forEach(tr => tr.remove());
-    const allChk = document.getElementById('selectAllChk');
-    if (allChk) allChk.checked = false;
-    updateTotals();
-    showToast(`🗑️ ${rows.length}行を削除しました`, 'info');
-  }
-
-  // ========== 全選択トグル ==========
-  function toggleSelectAll(checked) {
-    document.querySelectorAll('.row-select-chk').forEach(chk => {
-      chk.checked = checked;
-    });
   }
 
   // ========== 初期化 ==========
@@ -352,14 +242,6 @@
   if (localStorage.getItem('quoteData')) {
     const bar = document.getElementById('autosave-restore-bar');
     if (bar) setTimeout(() => bar.classList.add('show'), 600);
-  }
-  // カスタムカテゴリパネルを描画
-  renderUserCatPanel();
-  // 為替レート：自動モードなら起動時に取得
-  if (_fxAutoMode) {
-    fetchAutoFxRates().then(ok => {
-      if (ok) updateTotals();
-    });
   }
 
   // ========== トースト通知 ==========
@@ -889,90 +771,4 @@
       if (document.getElementById('previewOverlay')?.classList.contains('open')) closePreview();
       if (document.getElementById('fbOverlay')?.classList.contains('open'))      closeFeedback();
     }
-  });
-
-  // ========== 貨物情報フィールド並び替え ==========
-  const CARGO_FIELD_ORDER_KEY = 'cargoFieldOrder_v1';
-
-  function saveCargoFieldOrder() {
-    const grid = document.getElementById('cargoCondGrid');
-    if (!grid) return;
-    const order = Array.from(grid.querySelectorAll('.cond-field[data-field-id]'))
-      .map(el => el.dataset.fieldId);
-    localStorage.setItem(CARGO_FIELD_ORDER_KEY, JSON.stringify(order));
-  }
-
-  function restoreCargoFieldOrder() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(CARGO_FIELD_ORDER_KEY) || '[]');
-      if (!saved.length) return;
-      const grid = document.getElementById('cargoCondGrid');
-      if (!grid) return;
-      const fields = {};
-      grid.querySelectorAll('.cond-field[data-field-id]').forEach(el => {
-        fields[el.dataset.fieldId] = el;
-      });
-      // 保存順で並べ直す（未知のIDはスキップ、残りは末尾へ）
-      saved.forEach(id => {
-        if (fields[id]) grid.appendChild(fields[id]);
-      });
-    } catch(e) {}
-  }
-
-  function initCargoSort() {
-    const grid = document.getElementById('cargoCondGrid');
-    if (!grid) return;
-    let dragSrc = null;
-
-    grid.querySelectorAll('.cond-field[data-field-id]').forEach(field => {
-      const handle = field.querySelector('.cond-sort-handle');
-
-      // ハンドル以外からのドラッグを防ぐ
-      let _fromHandle = false;
-      if (handle) {
-        handle.addEventListener('mousedown', () => { _fromHandle = true; });
-        document.addEventListener('mouseup', () => { _fromHandle = false; }, { capture: true });
-      }
-
-      field.addEventListener('dragstart', e => {
-        if (!_fromHandle) { e.preventDefault(); return; }
-        _fromHandle = false;
-        dragSrc = field;
-        e.dataTransfer.effectAllowed = 'move';
-        setTimeout(() => field.classList.add('cond-field-dragging'), 0);
-      });
-      field.addEventListener('dragend', () => {
-        field.classList.remove('cond-field-dragging');
-        grid.querySelectorAll('.cond-field').forEach(f => f.classList.remove('cond-field-over'));
-        dragSrc = null;
-        saveCargoFieldOrder();
-      });
-      field.addEventListener('dragover', e => {
-        if (!dragSrc || dragSrc === field) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        grid.querySelectorAll('.cond-field').forEach(f => f.classList.remove('cond-field-over'));
-        field.classList.add('cond-field-over');
-      });
-      field.addEventListener('dragleave', () => field.classList.remove('cond-field-over'));
-      field.addEventListener('drop', e => {
-        e.preventDefault();
-        if (!dragSrc || dragSrc === field) return;
-        // dragSrcをfieldの前に挿入
-        const rect = field.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        if (e.clientX < midX) {
-          grid.insertBefore(dragSrc, field);
-        } else {
-          grid.insertBefore(dragSrc, field.nextSibling);
-        }
-        field.classList.remove('cond-field-over');
-      });
-    });
-  }
-
-  // DOMContentLoaded後に並び替え初期化・順序復元
-  document.addEventListener('DOMContentLoaded', () => {
-    restoreCargoFieldOrder();
-    initCargoSort();
   });
